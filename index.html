@@ -1,1 +1,899 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest.json">
+    
+    <link rel="icon" type="image/png" sizes="32x32" href="icon-512.png">
+    <link rel="apple-touch-icon" href="icon-512.png">
 
+    <meta name="theme-color" content="#1f2937">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="EdgAr IDE">
+
+    <title>EdgAr - Mobile IDE v3.8.9</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { overflow: hidden; touch-action: manipulation; height: 100dvh; background-color: #090d14; }
+        #editorContainer { height: calc(100dvh - 120px); position: relative; overflow: hidden; }
+        .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; background: #1f2937; }
+        input[type="file"] { display: none; }
+        
+        #mainEditor, #searchBackdrop {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5rem;
+            tab-size: 4;
+            white-space: pre;
+            overflow-wrap: normal;
+            padding: 1rem 1rem 1rem 3.5rem !important;
+            margin: 0;
+            border: none;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #mainEditor {
+            position: relative;
+            z-index: 2;
+            background: transparent !important;
+            color: white;
+            outline: none;
+            resize: none;
+            caret-color: #3b82f6;
+        }
+
+        #searchBackdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            background: #090d14;
+            color: transparent;
+            overflow: auto;
+            pointer-events: none;
+        }
+
+        mark.search-highlight {
+            background-color: #facc15;
+            color: #000;
+            border-radius: 2px;
+        }
+
+        mark.search-current {
+            background-color: #f97316;
+            color: #000;
+        }
+        
+        #lineNumbers {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3rem;
+            background: #0d111a;
+            color: #9ca3af;
+            font-family: monospace;
+            font-size: 0.875rem;
+            text-align: right;
+            padding-right: 0.5rem;
+            padding-top: 1rem;
+            user-select: none;
+            pointer-events: auto; 
+            border-right: 1px solid #374151;
+            overflow: hidden;
+            z-index: 3;
+            touch-action: none; 
+            transition: background-color 0.2s ease;
+        }
+
+        .toast {
+            animation: fadeIn 0.3s ease-out, fadeOut 0.3s ease-in 1.7s forwards;
+            z-index: 100;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-10px); } }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col font-sans">
+
+    <div id="toastContainer" class="fixed top-4 right-4 z-[60] flex flex-col space-y-2"></div>
+
+    <header class="h-14 px-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center shadow-md z-10">
+        <div class="flex items-center space-x-3">
+            <button onclick="toggleSidebar()" class="text-white text-xl hover:text-gray-300 transition">☰</button>
+            <h1 class="text-base font-bold text-blue-400 flex items-baseline">
+                Edg<span class="text-white">Ar</span> <span class="text-[10px] text-gray-500 uppercase ml-1 tracking-wider">IDE</span>
+            </h1>
+        </div>
+        
+        <div class="flex items-center space-x-1 h-9">
+            <button onclick="undo()" class="bg-gray-700 hover:bg-gray-600 w-8 h-full flex items-center justify-center rounded text-sm transition">↶</button>
+            <button onclick="redo()" class="bg-gray-700 hover:bg-gray-600 w-8 h-full flex items-center justify-center rounded text-sm transition mr-1">↷</button>
+            
+            <button onclick="toggleSearch()" class="bg-gray-700 hover:bg-gray-600 w-9 h-full flex items-center justify-center rounded text-sm transition">🔍</button>
+            <button onclick="formatCurrentCode()" class="bg-gray-700 hover:bg-gray-600 w-9 h-full flex items-center justify-center rounded text-sm transition">🪄</button>
+            <button id="lockBtn" onclick="toggleEditMode()" class="bg-gray-700 hover:bg-gray-600 w-9 h-full flex items-center justify-center rounded text-base transition-colors">⌨️</button>
+            <button onclick="runProject()" class="bg-green-600 hover:bg-green-500 px-3 h-full flex items-center justify-center rounded text-xs font-bold shadow-lg transition">Run</button>
+        </div>
+    </header>
+
+    <div id="sidebarOverlay" class="hidden fixed inset-0 bg-black/70 z-50" onclick="toggleSidebar()">
+        <div id="sidebar" class="w-64 h-full bg-gray-900 shadow-[5px_0_25px_rgba(0,0,0,0.7)] flex flex-col transform -translate-x-full transition-transform duration-300" onclick="event.stopPropagation()">
+            <div class="h-14 border-b border-gray-700 flex items-center justify-between px-4 bg-gray-800">
+                <span class="font-bold text-sm text-gray-300 uppercase tracking-wider">Menü</span>
+                <button onclick="toggleSidebar()" class="text-gray-400 hover:text-white text-lg">✕</button>
+            </div>
+            
+            <nav class="flex-1 p-2 space-y-1 bg-gray-900">
+                <label class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md cursor-pointer transition">
+                    <span class="text-yellow-500 text-lg">📁</span>
+                    <span class="font-semibold">Datei öffnen</span>
+                    <input type="file" id="fileInput" onchange="importFile(event)" multiple>
+                </label>
+                
+                <button onclick="saveProject(); toggleSidebar();" class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md transition text-left">
+                    <span class="text-blue-500 text-lg">💾</span>
+                    <span class="font-semibold">Datei speichern</span>
+                </button>
+                
+                <div class="border-b border-gray-700 my-2"></div>
+                
+                <div class="px-4 py-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest">Editor-Status</div>
+                <div class="px-4 py-1 text-xs text-gray-400 flex justify-between">
+                    <span>Aktiv:</span>
+                    <span id="sidebarStatusTab" class="text-blue-400 font-mono">index.html</span>
+                </div>
+            </nav>
+            
+            <div class="p-4 border-t border-gray-700 bg-gray-850 text-center text-xs text-gray-500">
+                EdgAr IDE v3.8.9
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-gray-800 flex text-xs font-mono border-b border-gray-700 overflow-x-auto z-10">
+        <button onclick="switchTab('html')" id="tab-html" class="px-4 py-3 border-r border-gray-700 hover:bg-gray-700 transition tab-active">index.html</button>
+        <button onclick="switchTab('css')" id="tab-css" class="px-4 py-3 border-r border-gray-700 hover:bg-gray-700 transition">style.css</button>
+        <button onclick="switchTab('js')" id="tab-js" class="px-4 py-3 border-r border-gray-700 hover:bg-gray-700 transition">script.js</button>
+    </div>
+
+    <div id="searchPanel" class="hidden bg-gray-850 p-2 border-b border-gray-800 flex items-center space-x-2 z-10">
+        <input id="searchInput" type="text" placeholder="Suchen..." class="flex-1 bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500" oninput="updateSearch()" onkeydown="if(event.key==='Enter') findNext()">
+        <button id="searchFuncBtn" onclick="toggleFunctionSearch()" class="bg-gray-800 hover:bg-gray-700 text-gray-400 font-bold w-8 h-7 flex items-center justify-center rounded text-xs transition-colors">ƒ</button>
+        <span id="searchStatus" class="text-[10px] text-gray-500">0/0</span>
+        <button onclick="findPrev()" class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs">◀</button>
+        <button onclick="findNext()" class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs">▶</button>
+    </div>
+
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+        
+        <div id="editorContainer" class="w-full border-b md:border-b-0 md:border-r border-gray-800 relative">
+            <div id="lineNumbers">1</div>
+            <div id="searchBackdrop"></div>
+            <textarea id="mainEditor" 
+                placeholder="Code hier eingeben..."
+                readonly
+                oninput="onEditorInput(event)"
+                onscroll="onEditorScroll()"
+                spellcheck="false"></textarea>
+        </div>
+
+        <div class="h-auto md:h-full md:w-1/3 flex flex-col p-3 space-y-2 bg-gray-900 border-t md:border-t-0 border-gray-700 z-10">
+            <div class="flex justify-between items-center h-9 mb-1">
+                <h2 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">KI-Input</h2>
+                
+                <div class="flex items-center space-x-2 h-full">
+                    <button onclick="clearAiInput()" class="text-xs text-red-400 hover:text-red-300 uppercase px-1 font-semibold">Clear</button>
+                    <button onclick="toggleSymbols()" class="bg-gray-700 hover:bg-gray-600 px-2.5 h-full rounded text-xs font-bold text-blue-300 transition flex items-center justify-center min-w-[32px]">{..}</button>
+                    <button onclick="setReplaceTarget()" class="bg-gray-700 hover:bg-gray-600 px-3 h-full rounded text-sm font-bold text-yellow-400 transition flex items-center justify-center min-w-[32px]" title="Ersetzt markierten Code">⇄</button>
+                    <button onclick="smartMerge()" class="bg-blue-600 hover:bg-blue-500 px-3 h-full rounded text-xs font-bold uppercase transition flex items-center justify-center">Merge</button>
+                </div>
+            </div>
+            
+            <div id="symbolsPanel" class="hidden flex space-x-2 bg-gray-850 p-1.5 rounded-md border border-gray-800">
+                <button onclick="insertChar('{')" class="bg-gray-800 px-3 py-1 rounded text-blue-300 font-bold text-xs flex-1 min-h-[32px]">{</button>
+                <button onclick="insertChar('}')" class="bg-gray-800 px-3 py-1 rounded text-blue-300 font-bold text-xs flex-1 min-h-[32px]">}</button>
+                <button onclick="insertChar(';')" class="bg-gray-800 px-3 py-1 rounded text-blue-300 font-bold text-xs flex-1 min-h-[32px]">;</button>
+                <button onclick="insertChar('=>')" class="bg-gray-800 px-3 py-1 rounded text-blue-300 font-bold text-xs flex-1 min-h-[32px]">=&gt;</button>
+            </div>
+            
+            <textarea id="aiInput" 
+                class="w-full h-10 md:h-[calc(100%-2rem)] bg-gray-950 border border-gray-700 rounded-md p-2 text-xs font-mono text-blue-100 outline-none focus:border-blue-500 overflow-y-auto" 
+                placeholder="Hier Code einfügen..."
+                oninput="autoResizeAiInput(this)"
+                spellcheck="false"></textarea>
+        </div>
+
+        <div id="previewDrawer" class="hidden fixed inset-0 bg-gray-900 flex flex-col z-50">
+            <div class="h-10 bg-gray-800 border-b border-gray-700 flex justify-between items-center px-4">
+                <h3 class="font-bold text-xs text-green-400">Live-Vorschau</h3>
+                
+                <div class="flex space-x-2">
+                    <button onclick="toggleBrowserFullscreen()" class="text-xs text-gray-400 hover:text-white px-2">⛶</button>
+                    <button onclick="closePreview()" class="bg-red-600 hover:bg-red-500 w-7 h-7 flex items-center justify-center rounded text-sm font-bold transition">✕</button>
+                </div>
+            </div>
+            <iframe id="previewFrame" class="w-full flex-1 bg-white border-none"></iframe>
+        </div>
+    </main>
+
+    <script>
+        // --- ZUSTAND & SPEICHERUNG ---
+        let activeTab = localStorage.getItem('sc_activeTab') || 'html';
+        let isReadOnly = true; 
+        let isFunctionSearch = false; 
+        
+        let files = {
+            html: `<!DOCTYPE html>\n<html>\n<head>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <h1 style="color: #333; margin-top: 20px;">Projekt bereit</h1>\n  <button id="btn" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer;">Klick mich</button>\n  <script src="script.js"><\/script>\n</body>\n</html>`,
+            css: `body { background: #f4f4f4; color: #333; text-align: center; font-family: sans-serif; }\n.openlibrary { border: 1px solid blue; }`,
+            js: `function openlibrary() {\n  alert('Funktion gefunden!');\n}\n\ndocument.getElementById('btn').addEventListener('click', () => {\n  openlibrary();\n});`
+        };
+
+        let scrollPositions = { html: 0, css: 0, js: 0 };
+
+        let undoStacks = { html: [], css: [], js: [] };
+        let redoStacks = { html: [], css: [], js: [] };
+        const MAX_HISTORY = 50; 
+
+        let searchMatches = [];
+        let currentSearchIndex = -1;
+
+        const savedFiles = localStorage.getItem('sc_project');
+        if (savedFiles) files = JSON.parse(savedFiles);
+        
+        const savedScrolls = localStorage.getItem('sc_scrollPositions');
+        if (savedScrolls) scrollPositions = JSON.parse(savedScrolls);
+
+        const editorEl = document.getElementById('mainEditor');
+        const backdropEl = document.getElementById('searchBackdrop');
+        const lineNumbersEl = document.getElementById('lineNumbers');
+
+        editorEl.value = files[activeTab];
+        backdropEl.innerText = files[activeTab];
+
+        undoStacks[activeTab].push(files[activeTab]);
+
+        function autoResizeAiInput(el) {
+            if (window.innerWidth < 768) {
+                el.style.height = '40px'; 
+                const newHeight = Math.min(el.scrollHeight, 150); 
+                el.style.height = newHeight + 'px';
+            }
+        }
+
+        function showToast(msg, type = "blue") {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const colors = { blue: "bg-blue-600 text-white", green: "bg-green-600 text-white", red: "bg-red-600 text-white" };
+            toast.className = `${colors[type]} text-xs font-semibold px-4 py-2 rounded-md shadow-lg toast`;
+            toast.innerText = msg;
+            container.appendChild(toast);
+            setTimeout(() => { toast.remove(); }, 2000);
+        }
+
+        function toggleSidebar() {
+            const overlay = document.getElementById('sidebarOverlay');
+            const sidebar = document.getElementById('sidebar');
+            
+            if (overlay.classList.contains('hidden')) {
+                overlay.classList.remove('hidden');
+                setTimeout(() => { sidebar.classList.remove('-translate-x-full'); }, 10);
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                setTimeout(() => { overlay.classList.add('hidden'); }, 300);
+            }
+        }
+
+        function toggleEditMode() {
+            const btn = document.getElementById('lockBtn');
+            isReadOnly = !isReadOnly;
+            
+            if (isReadOnly) {
+                editorEl.readOnly = true;
+                btn.innerText = "⌨️"; 
+                btn.classList.remove('bg-yellow-600', 'text-black');
+                btn.classList.add('bg-gray-700', 'text-white');
+                editorEl.blur(); 
+            } else {
+                editorEl.readOnly = false;
+                btn.innerText = "👁️"; 
+                btn.classList.remove('bg-gray-700', 'text-white');
+                btn.classList.add('bg-yellow-600', 'text-black');
+                editorEl.focus();
+            }
+        }
+
+        function updateLineNumbers() {
+            const lines = editorEl.value.split('\n').length;
+            let numStr = '';
+            for (let i = 1; i <= lines; i++) { numStr += i + '<br>'; }
+            lineNumbersEl.innerHTML = numStr;
+        }
+
+        function syncScroll() {
+            backdropEl.scrollTop = editorEl.scrollTop;
+            backdropEl.scrollLeft = editorEl.scrollLeft;
+            lineNumbersEl.scrollTop = editorEl.scrollTop;
+        }
+
+        function onEditorScroll() {
+            syncScroll();
+            scrollPositions[activeTab] = editorEl.scrollTop;
+            localStorage.setItem('sc_scrollPositions', JSON.stringify(scrollPositions));
+        }
+
+        let typingTimer;
+        function onEditorInput(e) {
+            if (!isReadOnly && e.inputType === 'insertText' && e.data) {
+                handleAutoClose(e.data);
+            }
+
+            updateCurrentFile();
+            updateLineNumbers();
+            updateSearch();
+
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                saveToUndoStack(editorEl.value);
+            }, 500);
+        }
+
+        function handleAutoClose(char) {
+            const pairs = { '{': '}', '(': ')', '[': ']' };
+            
+            if (pairs[char]) {
+                const start = editorEl.selectionStart;
+                const end = editorEl.selectionEnd;
+                const text = editorEl.value;
+                
+                editorEl.value = text.substring(0, start) + pairs[char] + text.substring(end);
+                editorEl.selectionStart = editorEl.selectionEnd = start;
+                backdropEl.innerText = editorEl.value;
+            }
+        }
+
+        function saveToUndoStack(code) {
+            const stack = undoStacks[activeTab];
+            if (stack.length === 0 || stack[stack.length - 1] !== code) {
+                stack.push(code);
+                if (stack.length > MAX_HISTORY) stack.shift();
+                redoStacks[activeTab] = [];
+            }
+        }
+
+        function undo() {
+            const uStack = undoStacks[activeTab];
+            const rStack = redoStacks[activeTab];
+            
+            if (uStack.length <= 1) {
+                showToast("Nichts zum Rückgängig machen!", "blue");
+                return;
+            }
+
+            const currentState = uStack.pop();
+            rStack.push(currentState);
+            const previousState = uStack[uStack.length - 1];
+            
+            applyHistoryState(previousState);
+            showToast("Rückgängig gemacht", "blue");
+        }
+
+        function redo() {
+            const uStack = undoStacks[activeTab];
+            const rStack = redoStacks[activeTab];
+
+            if (rStack.length === 0) {
+                showToast("Nichts zum Wiederholen!", "blue");
+                return;
+            }
+
+            const nextState = rStack.pop();
+            uStack.push(nextState);
+
+            applyHistoryState(nextState);
+            showToast("Wiederholt", "blue");
+        }
+
+        function applyHistoryState(code) {
+            const wasReadOnly = isReadOnly;
+            if (wasReadOnly) editorEl.readOnly = false;
+            
+            editorEl.value = code;
+            files[activeTab] = code;
+            localStorage.setItem('sc_project', JSON.stringify(files));
+            
+            updateLineNumbers();
+            updateSearch();
+            
+            if (wasReadOnly) editorEl.readOnly = true;
+        }
+
+        function formatCurrentCode() {
+            const wasLocked = isReadOnly;
+            if (wasLocked) { editorEl.readOnly = false; }
+            
+            let code = editorEl.value;
+            let formatted = '';
+            let indentLevel = 0;
+            const lines = code.split('\n');
+            
+            for (let line of lines) {
+                let trimmed = line.trim();
+                if (!trimmed) continue;
+                if (trimmed.startsWith('}') || trimmed.startsWith('</')) { indentLevel = Math.max(0, indentLevel - 1); }
+                formatted += '  '.repeat(indentLevel) + trimmed + '\n';
+                if ((trimmed.endsWith('{') || trimmed.startsWith('<') && !trimmed.startsWith('</') && !trimmed.endsWith('/>') && !trimmed.includes('</'))) { indentLevel++; }
+            }
+            
+            editorEl.value = formatted.trim() + '\n';
+            updateCurrentFile();
+            updateLineNumbers();
+            updateSearch();
+            
+            saveToUndoStack(editorEl.value);
+            
+            if (wasLocked) { editorEl.readOnly = true; }
+        }
+
+        function toggleSymbols() {
+            document.getElementById('symbolsPanel').classList.toggle('hidden');
+        }
+
+        function toggleSearch() {
+            const panel = document.getElementById('searchPanel');
+            const input = document.getElementById('searchInput');
+            panel.classList.toggle('hidden');
+            if(!panel.classList.contains('hidden')) { 
+                input.focus(); 
+                updateSearch();
+            } else {
+                renderHighlights(); 
+            }
+        }
+
+        function toggleFunctionSearch() {
+            const btn = document.getElementById('searchFuncBtn');
+            isFunctionSearch = !isFunctionSearch;
+            
+            if(isFunctionSearch) {
+                btn.classList.remove('bg-gray-800', 'text-gray-400');
+                btn.classList.add('bg-blue-600', 'text-white');
+                showToast("Funktions-Filter aktiv", "blue");
+            } else {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-gray-800', 'text-gray-400');
+            }
+            updateSearch();
+        }
+
+        function setReplaceTarget() {
+            const start = editorEl.selectionStart;
+            const end = editorEl.selectionEnd;
+            const selectedText = editorEl.value.substring(start, end).trim();
+            
+            if (!selectedText) {
+                showToast("Bitte zuerst Text im Code markieren!", "red");
+                return;
+            }
+            
+            const aiInp = document.getElementById('aiInput');
+            const currentAiVal = aiInp.value;
+            
+            aiInp.value = `REPLACE: ${selectedText}\n${currentAiVal}`;
+            autoResizeAiInput(aiInp);
+            showToast(`Target gesetzt: ${selectedText}`, "green");
+        }
+
+        function updateSearch() {
+            const query = document.getElementById('searchInput').value;
+            const text = editorEl.value;
+            
+            searchMatches = [];
+            currentSearchIndex = -1;
+
+            if (!query || document.getElementById('searchPanel').classList.contains('hidden')) { 
+                backdropEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+                document.getElementById('searchStatus').innerText = "0/0"; 
+                return; 
+            }
+
+            const textLower = text.toLowerCase();
+            let queryLower = query.toLowerCase();
+            let customMatches = [];
+            
+            if (isFunctionSearch) {
+                let regex;
+                if (activeTab === 'js') {
+                    regex = new RegExp(`(function\\s+${queryLower}|const\\s+${queryLower}|let\\s+${queryLower}|var\\s+${queryLower})`, 'gi');
+                } else if (activeTab === 'css') {
+                    regex = new RegExp(`(\\.${queryLower}|#${queryLower})`, 'gi');
+                } else if (activeTab === 'html') {
+                    regex = new RegExp(`(<${queryLower}|id="${queryLower}")`, 'gi');
+                }
+
+                if (regex) {
+                    let match;
+                    while ((match = regex.exec(text)) !== null) {
+                        customMatches.push(match.index);
+                    }
+                }
+                searchMatches = customMatches;
+            } else {
+                let index = textLower.indexOf(queryLower);
+                while (index !== -1) {
+                    searchMatches.push(index);
+                    index = textLower.indexOf(queryLower, index + query.length);
+                }
+            }
+
+            document.getElementById('searchStatus').innerText = searchMatches.length > 0 ? `1/${searchMatches.length}` : "0/0";
+            if (searchMatches.length > 0) { currentSearchIndex = 0; }
+            
+            renderHighlights();
+        }
+
+        function renderHighlights() {
+            const query = document.getElementById('searchInput').value;
+            const text = editorEl.value;
+            
+            if (!query || searchMatches.length === 0 || document.getElementById('searchPanel').classList.contains('hidden')) {
+                backdropEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+                return;
+            }
+
+            let resultHtml = "";
+            let lastIdx = 0;
+
+            searchMatches.forEach((matchIdx, i) => {
+                resultHtml += escapeHtml(text.substring(lastIdx, matchIdx));
+                
+                let matchLength = query.length;
+                if (isFunctionSearch) {
+                    const textSlice = text.substring(matchIdx).toLowerCase();
+                    if (activeTab === 'js' && textSlice.startsWith("function")) matchLength = 8 + 1 + query.length;
+                    else if (activeTab === 'css' || activeTab === 'html') matchLength = query.length + 1;
+                }
+                
+                const matchText = text.substring(matchIdx, matchIdx + matchLength);
+                const isCurrent = i === currentSearchIndex;
+                resultHtml += `<mark class="search-highlight ${isCurrent ? 'search-current' : ''}">${escapeHtml(matchText)}</mark>`;
+                lastIdx = matchIdx + matchLength;
+            });
+
+            resultHtml += escapeHtml(text.substring(lastIdx));
+            backdropEl.innerHTML = resultHtml.replace(/\n/g, '<br>') + '<br>'; 
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function selectMatch() {
+            renderHighlights();
+            document.getElementById('searchStatus').innerText = `${currentSearchIndex + 1}/${searchMatches.length}`;
+            
+            const start = searchMatches[currentSearchIndex];
+            const lineHeight = 24; 
+            const lines = editorEl.value.substring(0, start).split("\n").length;
+            const editorHeight = editorEl.clientHeight;
+            const targetScroll = (lines * lineHeight) - (editorHeight / 2);
+            
+            editorEl.scrollTop = targetScroll;
+            syncScroll();
+        }
+
+        function findNext() {
+            if (searchMatches.length === 0) return;
+            currentSearchIndex = (currentSearchIndex + 1) % searchMatches.length;
+            selectMatch();
+        }
+
+        function findPrev() {
+            if (searchMatches.length === 0) return;
+            currentSearchIndex = (currentSearchIndex - 1 + searchMatches.length) % searchMatches.length;
+            selectMatch();
+        }
+
+        function updateCurrentFile() { 
+            files[activeTab] = editorEl.value; 
+            localStorage.setItem('sc_project', JSON.stringify(files));
+        }
+
+        function switchTab(tab, isInitial = false) {
+            if (!isInitial) updateCurrentFile();
+            
+            document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.remove('tab-active'));
+            document.getElementById('tab-' + tab).classList.add('tab-active');
+            activeTab = tab;
+            
+            localStorage.setItem('sc_activeTab', activeTab);
+            
+            editorEl.value = files[activeTab];
+            backdropEl.innerText = files[activeTab];
+            
+            if (!isInitial) showToast(`Tab: ${tab.toUpperCase()}`, "blue");
+            
+            document.getElementById('sidebarStatusTab').innerText = `${tab}.html`;
+            if (tab === 'css') document.getElementById('sidebarStatusTab').innerText = `style.css`;
+            if (tab === 'js') document.getElementById('sidebarStatusTab').innerText = `script.js`;
+            
+            updateSearch();
+            updateLineNumbers();
+
+            if (undoStacks[activeTab].length === 0) {
+                undoStacks[activeTab].push(files[activeTab]);
+            }
+            
+            setTimeout(() => {
+                editorEl.scrollTop = scrollPositions[tab] || 0;
+                syncScroll();
+            }, 10);
+        }
+
+        function smartMerge() {
+            const aiCode = document.getElementById('aiInput').value.trim();
+            if (!aiCode) return;
+
+            const lines = aiCode.split('\n');
+            let replaceKeyword = null;
+            let processableCode = aiCode;
+
+            if (lines[0].startsWith("REPLACE: ")) {
+                replaceKeyword = lines[0].substring(9).trim();
+                lines.shift(); 
+                processableCode = lines.join('\n').trim();
+            }
+
+            const cssRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+            const jsRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+
+            let cssChunks = [];
+            let jsChunks = [];
+            let match;
+
+            while ((match = cssRegex.exec(processableCode)) !== null) {
+                cssChunks.push(match[1].trim());
+            }
+            while ((match = jsRegex.exec(processableCode)) !== null) {
+                jsChunks.push(match[1].trim());
+            }
+
+            let htmlChunk = processableCode
+                .replace(cssRegex, "")
+                .replace(jsRegex, "")
+                .trim();
+
+            const wasReadOnly = isReadOnly;
+            if (wasReadOnly) { isReadOnly = false; editorEl.readOnly = false; }
+
+            let insertedAnything = false;
+
+            if (cssChunks.length > 0) {
+                const fullCss = cssChunks.join("\n\n");
+                files.css += (files.css ? "\n\n" : "") + fullCss;
+                undoStacks.css.push(files.css);
+                insertedAnything = true;
+                showToast("CSS einsortiert!", "green");
+            }
+
+            if (jsChunks.length > 0) {
+                const fullJs = jsChunks.join("\n\n");
+                files.js += (files.js ? "\n\n" : "") + fullJs;
+                undoStacks.js.push(files.js);
+                insertedAnything = true;
+                showToast("JS einsortiert!", "green");
+            }
+
+            if (htmlChunk.length > 0 || replaceKeyword) {
+                if (htmlChunk.length === 0 && insertedAnything) {
+                    // Do nothing
+                } else {
+                    const currentHtml = files.html;
+                    
+                    if (replaceKeyword) {
+                        const replaceIndex = currentHtml.indexOf(replaceKeyword);
+                        if (replaceIndex !== -1) {
+                            files.html = currentHtml.substring(0, replaceIndex) + htmlChunk + currentHtml.substring(replaceIndex + replaceKeyword.length);
+                            showToast(`"${replaceKeyword}" ersetzt!`, "green");
+                        } else {
+                            showToast(`"${replaceKeyword}" nicht gefunden! Normal angehängt.`, "blue");
+                            files.html += (files.html ? "\n\n" : "") + htmlChunk;
+                        }
+                    } else {
+                        files.html += (files.html ? "\n\n" : "") + htmlChunk;
+                        showToast("HTML einsortiert!", "green");
+                    }
+                    undoStacks.html.push(files.html);
+                }
+            }
+
+            localStorage.setItem('sc_project', JSON.stringify(files));
+
+            editorEl.value = files[activeTab];
+            backdropEl.innerText = files[activeTab];
+
+            const aiInp = document.getElementById('aiInput');
+            aiInp.value = "";
+            if (window.innerWidth < 768) aiInp.style.height = '40px';
+
+            updateLineNumbers();
+            updateSearch();
+            editorEl.focus();
+
+            if (wasReadOnly) {
+                isReadOnly = true;
+                editorEl.readOnly = true;
+                document.getElementById('lockBtn').innerText = "⌨️";
+                document.getElementById('lockBtn').classList.remove('bg-yellow-600', 'text-black');
+                document.getElementById('lockBtn').classList.add('bg-gray-700', 'text-white');
+                editorEl.blur();
+            }
+        }
+
+        function runProject() {
+            updateCurrentFile();
+            saveToUndoStack(editorEl.value);
+            
+            const htmlVal = files.html;
+            const cssVal = files.css;
+            let jsVal = files.js;
+
+            const errorTracker = `
+                window.onerror = function(message, source, lineno, colno, error) {
+                    window.parent.postMessage({
+                        type: 'iframeError',
+                        msg: message,
+                        line: lineno
+                    }, '*');
+                    return false;
+                };
+            `;
+            
+            jsVal = errorTracker + "\n" + jsVal;
+
+            let combined = htmlVal;
+            combined = combined.replace('<link rel="stylesheet" href="style.css">', `<style>${cssVal}</style>`);
+            combined = combined.replace('<script src="script.js"><\/script>', `<script>${jsVal}<\/script>`);
+            
+            const frame = document.getElementById('previewFrame');
+            const drawer = document.getElementById('previewDrawer');
+            
+            frame.srcdoc = combined;
+            drawer.classList.remove('hidden');
+        }
+
+        function closePreview() {
+            const drawer = document.getElementById('previewDrawer');
+            const frame = document.getElementById('previewFrame');
+            drawer.classList.add('hidden');
+            frame.srcdoc = ""; 
+            if (document.fullscreenElement) { document.exitFullscreen(); }
+        }
+
+        function toggleBrowserFullscreen() {
+            const elem = document.documentElement;
+            if (!document.fullscreenElement) {
+                elem.requestFullscreen().catch(err => { showToast("Vollbild nicht unterstützt", "red"); });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        function saveProject() {
+            updateCurrentFile();
+            localStorage.setItem('sc_project', JSON.stringify(files));
+            showToast("Erfolgreich gespeichert!", "green");
+        }
+
+        function clearAiInput() {
+            const aiInp = document.getElementById('aiInput');
+            aiInp.value = "";
+            if (window.innerWidth < 768) aiInp.style.height = '40px';
+            showToast("Feld geleert", "blue");
+        }
+
+        function insertChar(char) {
+            if (isReadOnly) return;
+            const start = editorEl.selectionStart;
+            const end = editorEl.selectionEnd;
+            const text = editorEl.value;
+            editorEl.value = text.substring(0, start) + char + text.substring(end);
+            editorEl.selectionStart = editorEl.selectionEnd = start + char.length;
+            updateCurrentFile();
+            
+            saveToUndoStack(editorEl.value);
+            
+            editorEl.focus();
+            updateLineNumbers();
+            updateSearch();
+        }
+
+        function importFile(event) {
+            const filesList = event.target.files;
+            if (filesList.length === 0) return;
+
+            Array.from(filesList).forEach(file => {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    const content = e.target.result;
+                    const name = file.name.toLowerCase();
+                    
+                    if (name.endsWith('.html') || name.endsWith('.htm')) { 
+                        files.html = content; 
+                        if (activeTab === 'html') editorEl.value = content;
+                        saveToUndoStack(content);
+                    }
+                    else if (name.endsWith('.css')) { 
+                        files.css = content; 
+                        if (activeTab === 'css') editorEl.value = content;
+                        saveToUndoStack(content);
+                    }
+                    else if (name.endsWith('.js')) { 
+                        files.js = content; 
+                        if (activeTab === 'js') editorEl.value = content;
+                        saveToUndoStack(content);
+                    }
+                    
+                    updateCurrentFile();
+                    updateLineNumbers();
+                    updateSearch();
+                    syncScroll();
+                    showToast(`${file.name} erfolgreich geladen!`, "green");
+                };
+                
+                reader.readAsText(file);
+            });
+            
+            event.target.value = '';
+            toggleSidebar();
+        }
+        
+        switchTab(activeTab, true);
+        
+        updateLineNumbers();
+        syncScroll();
+        editorEl.addEventListener('scroll', onEditorScroll);
+
+        let startY = 0;
+        let startScrollTop = 0;
+
+        lineNumbersEl.addEventListener('touchstart', (e) => {
+            startY = e.touches[0].pageY;
+            startScrollTop = editorEl.scrollTop;
+            lineNumbersEl.style.backgroundColor = '#1e293b';
+            e.preventDefault(); 
+        }, { passive: false });
+
+        lineNumbersEl.addEventListener('touchmove', (e) => {
+            const currentY = e.touches[0].pageY;
+            const deltaY = (startY - currentY) * 4.0; 
+            editorEl.scrollTop = startScrollTop + deltaY;
+            syncScroll();
+            e.preventDefault();
+        }, { passive: false });
+
+        lineNumbersEl.addEventListener('touchend', () => {
+            lineNumbersEl.style.backgroundColor = '#0d111a';
+        });
+        lineNumbersEl.addEventListener('touchcancel', () => {
+            lineNumbersEl.style.backgroundColor = '#0d111a';
+        });
+
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'iframeError') {
+                const correctedLine = event.data.line - 12;
+                showToast(`Fehler in Zeile ${correctedLine}: ${event.data.msg}`, "red");
+            }
+        });
+    </script>
+</body>
+</html>
