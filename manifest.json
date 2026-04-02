@@ -1,1 +1,31 @@
-
+{
+  "name": "EdgAr IDE",
+  "short_name": "EdgAr",
+  "description": "Smart, Mobile IDE featuring integrated AI assistance and code formatter.",
+  "start_url": "index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#111827",
+  "theme_color": "#1f2937",
+  "dir": "ltr",
+  "lang": "de-DE",
+  "icons": [
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": [
+    "productivity",
+    "utilities",
+    "developer"
+  ]
+}
