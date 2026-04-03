@@ -763,23 +763,25 @@
         }
 
                 function saveAsProject() {
+            upda        function saveAsProject() {
             updateCurrentFile(); // Aktuellen Stand sichern
             
             const content = files[activeTab];
-            let filename = "index.html";
-            let mimeType = "text/html";
+            let filename = "";
+            let mimeType = "";
             
             // Greift auf den Namen der geladenen Datei zurück, falls vorhanden
             const loadedFileName = localStorage.getItem('sc_loadedFileName') || 'index';
             
+            // Logische Korrektur der Dateinamensvergabe
             if (activeTab === 'html') {
                 filename = `${loadedFileName}.html`;
                 mimeType = "text/html";
             } else if (activeTab === 'css') {
-                filename = activeTab === 'html' ? "style.css" : `${loadedFileName}.css`;
+                filename = (loadedFileName === 'index') ? "style.css" : `${loadedFileName}.css`;
                 mimeType = "text/css";
             } else if (activeTab === 'js') {
-                filename = activeTab === 'html' ? "script.js" : `${loadedFileName}.js`;
+                filename = (loadedFileName === 'index') ? "script.js" : `${loadedFileName}.js`;
                 mimeType = "application/javascript";
             }
             
@@ -789,16 +791,20 @@
             
             a.href = url;
             a.download = filename;
+            
+            // Trick für Mobilgeräte: Unsichtbar einhängen, klicken, entfernen
+            a.style.display = 'none';
             document.body.appendChild(a);
             a.click();
             
             setTimeout(() => {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-            }, 0);
+            }, 100);
             
-            showToast(`${filename} wird heruntergeladen...`, "green");
+            showToast(`${filename} wurde heruntergeladen!`, "green");
         }
+
 
         function importFile(event) {
             const file = event.target.files[0];
