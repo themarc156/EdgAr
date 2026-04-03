@@ -762,18 +762,35 @@
             onEditorInput({inputType: 'insertText'});
         }
 
-                function saveAsProject() {
-            upda        function saveAsProject() {
+                        function toggleSidebar() {
+            const overlay = document.getElementById('sidebarOverlay');
+            const sidebar = document.getElementById('sidebar');
+            
+            // Wir prüfen, ob die Klasse 'hidden' aktuell gesetzt ist
+            const isHidden = overlay.classList.contains('hidden');
+            
+            if (isHidden) {
+                overlay.classList.remove('hidden');
+                setTimeout(() => {
+                    sidebar.classList.remove('-translate-x-full');
+                }, 10);
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                }, 300);
+            }
+        }
+
+        function saveAsProject() {
             updateCurrentFile(); // Aktuellen Stand sichern
             
             const content = files[activeTab];
             let filename = "";
             let mimeType = "";
             
-            // Greift auf den Namen der geladenen Datei zurück, falls vorhanden
             const loadedFileName = localStorage.getItem('sc_loadedFileName') || 'index';
             
-            // Logische Korrektur der Dateinamensvergabe
             if (activeTab === 'html') {
                 filename = `${loadedFileName}.html`;
                 mimeType = "text/html";
@@ -792,7 +809,6 @@
             a.href = url;
             a.download = filename;
             
-            // Trick für Mobilgeräte: Unsichtbar einhängen, klicken, entfernen
             a.style.display = 'none';
             document.body.appendChild(a);
             a.click();
@@ -804,6 +820,7 @@
             
             showToast(`${filename} wurde heruntergeladen!`, "green");
         }
+
 
 
         function importFile(event) {
