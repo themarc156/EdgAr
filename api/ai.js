@@ -1,17 +1,21 @@
-export default async function handler(req, res) {
+const G_KEY = process.env.GROQ_API_KEY;
+
+module.exports = async (req, res) => {
+    // Falls Vercel die Datei ausführt, sehen wir das ab jetzt 100% in den Logs!
+    console.log("API aufgerufen, Methode:", req.method);
+
     if (req.method !== "POST") {
         return res.status(405).json({ error: "Only POST allowed" });
     }
 
     const { prompt, mode } = req.body;
 
-    // 1. Prüfen, ob der API-Key überhaupt da ist
-    if (!process.env.GROQ_API_KEY) {
-        return res.status(500).json({ 
-            error: "GROQ_API_KEY ist in den Vercel-Einstellungen nicht hinterlegt!" 
-        });
+    if (!G_KEY) {
+        console.error("KRITISCH: Kein API-Key in Vercel hinterlegt!");
+        return res.status(500).json({ error: "API-Key fehlt in Vercel!" });
     }
 
+    // Aktuelle Groq-Modelle
     let model = "llama-3.3-70b-versatile";
     if (mode === "fast") model = "llama-3.1-8b-instant";
     if (mode === "cheap") model = "llama-3.2-3b-preview";
@@ -20,7 +24,7 @@ export default async function handler(req, res) {
         const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+                "Authorization": "Bearer " + G_KEY,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
@@ -32,8 +36,19 @@ export default async function handler(req, res) {
         const data = await response.json();
 
         if (!response.ok) {
+            console.error("Groq hat Fehler gemeldet:", data);
             return res.status(response.status).json({
-                error: data.error?.message || "Fehler bei der Groq-API"
+                error: data.error?.message || "Fehler bei Groq"
+            });
+        }
+
+        return res.status(200).json(data);
+
+    } catch (err) {
+        console.error("Fehler beim Fetch:", err.message);
+        return res.status(500).json({ error: "Server-Crash: " + err.message });
+    }
+};
             });
         }
 
