@@ -1,4 +1,18 @@
+const G_KEY = process.env.GROQ_API_KEY;
 
+module.exports = async (req, res) => {
+    console.log("API aufgerufen, Methode:", req.method);
+
+    if (req.method !== "POST") {
+        return res.status(405).json({ error: "Only POST allowed" });
+    }
+
+    const { prompt, mode } = req.body;
+
+    if (!G_KEY) {
+        console.error("KRITISCH: Kein API-Key in Vercel hinterlegt!");
+        return res.status(500).json({ error: "API-Key fehlt in Vercel!" });
+    }
 
     // Aktuelle Groq-Modelle
     let model = "llama-3.3-70b-versatile";
