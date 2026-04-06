@@ -915,6 +915,74 @@ function handleKey(e) {
     }
 }
 
+async function sendAI() {
+    if (promptQueue.length === 0) {
+        // Falls die Warteschlange leer ist, nehmen wir einfach den Text, der JETZT im Feld steht
+        const currentInput = document.getElementById("aiInput").value.trim();
+        if (currentInput) {
+            promptQueue.push(currentInput);
+        } else {
+            showToast("Keine Prompts!", "red");
+            return;
+        }
+    }
+
+    const mode = document.getElementById("aiMode").value;
+    const code = editorEl.value;
+
+    showToast("KI denkt...", "blue");
+
+    const fullPrompt = `
+You are an expert web developer.
+
+Project code:
+${code}
+
+Tasks:
+${promptQueue.map((p, i) => `${i + 1}. ${p}`).join("\n")}
+
+Rules:
+- Return ONLY code
+- Improve structure
+`;
+
+    console.log("Sending:", fullPrompt);
+
+    try {
+        // Hier setzen wir die ABSOLUTE Vercel-URL ein!
+        const res = await fetch("https://edgaride.vercel.app/api/ai", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                prompt: fullPrompt,
+                mode: mode
+            })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            // Zeigt uns im Toast den echten Fehler an, falls Groq meckert!
+            showToast(`Fehler: ${data.error || "Server-Fehler"}`, "red");
+            return;
+        }
+
+        const aiCode = data.choices[0].message.content;
+
+        document.getElementById('aiInput').value = aiCode;
+        
+        // Die Warteschlange erst leeren, wenn die Anfrage erfolgreich war!
+        promptQueue = [];
+
+        showToast("Fertig 🚀", "green");
+
+    } catch (err) {
+        console.error(err);
+        showToast("KI Fehler", "red");
+    }
+}
 
 
 
