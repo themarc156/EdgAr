@@ -758,7 +758,8 @@
 async function callAiApi(fullPrompt) {
     showToast("KI wird angefragt...", "blue");
     try {
-        const res = await fetch("/api/ai", {
+        const res = await fetch("https://edgaride.vercel.app/api/ai", {
+
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
