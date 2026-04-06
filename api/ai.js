@@ -5,12 +5,19 @@ export default async function handler(req, res) {
 
     const { prompt, mode } = req.body;
 
-    let model = "llama3-70b-8192";
+        // Standardmodell (Smart) -> Jetzt das extrem schnelle Llama 3.3 70B
+    let model = "llama-3.3-70b-versatile";
 
-    if (mode === "fast") model = "mixtral-8x7b-32768";
-    if (mode === "cheap") model = "llama3-8b-8192";
+    if (mode === "fast") {
+        // Schnell -> Das kleinere, pfeilschnelle Llama 3.1 8B
+        model = "llama-3.1-8b-instant";
+    }
 
-    try {
+    if (mode === "cheap") {
+        // Günstig -> Ein kleineres Modell
+        model = "llama-3.2-3b-preview";
+    
+   try {
         const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: {
