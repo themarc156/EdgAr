@@ -1,7 +1,6 @@
 const G_KEY = process.env.GROQ_API_KEY;
 
 module.exports = async (req, res) => {
-    // Falls Vercel die Datei ausführt, sehen wir das ab jetzt 100% in den Logs!
     console.log("API aufgerufen, Methode:", req.method);
 
     if (req.method !== "POST") {
@@ -49,72 +48,3 @@ module.exports = async (req, res) => {
         return res.status(500).json({ error: "Server-Crash: " + err.message });
     }
 };
-            });
-        }
-
-        return res.status(200).json(data);
-
-    } catch (err) {
-        // Falls hier wirklich etwas crasht, fangen wir es ab, statt den Server zu töten!
-        return res.status(500).json({ 
-            error: `Server-Crash abgefangen: ${err.message}` 
-        });
-    }
-}
-        });
-
-        const data = await response.json();
-
-        // 🛡️ API Fehler sauber abfangen
-        if (!response.ok) {
-            console.error("Groq API Error:", data);
-            return res.status(response.status).json({
-                error: data.error?.message || "Groq API request failed"
-            });
-        }
-
-        // 🛡️ EXTRA Schutz gegen undefined
-        if (!data.choices || !data.choices[0]) {
-            console.error("Invalid AI response:", data);
-            return res.status(500).json({
-                error: "Invalid AI response format"
-            });
-        }
-
-        return res.status(200).json(data);
-
-    } catch (err) {
-        console.error("Server Error:", err);
-        return res.status(500).json({
-            error: "AI request failed completely"
-        });
-    }
-}
-
-        const data = await response.json();
-
-        // ? API Fehler sauber abfangen
-        if (!response.ok) {
-            console.error("Groq API Error:", data);
-            return res.status(response.status).json({
-                error: data.error?.message || "Groq API request failed"
-            });
-        }
-
-        // ? EXTRA Schutz gegen undefined
-        if (!data.choices || !data.choices[0]) {
-            console.error("Invalid AI response:", data);
-            return res.status(500).json({
-                error: "Invalid AI response format"
-            });
-        }
-
-        return res.status(200).json(data);
-
-    } catch (err) {
-        console.error("Server Error:", err);
-        return res.status(500).json({
-            error: "AI request failed completely"
-        });
-    }
-}
