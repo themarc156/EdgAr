@@ -237,13 +237,22 @@ mark.search-current {
         <button onclick="switchTab('js')" id="tab-js" class="px-4 py-3 border-r border-gray-700 hover:bg-gray-700 transition">script.js</button>
     </div>
 
-    <div id="searchPanel" class="hidden bg-gray-850 p-2 border-b border-gray-800 flex items-center space-x-2 z-10">
-        <input id="searchInput" type="text" placeholder="Suchen..." class="flex-1 bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500" oninput="updateSearch()" onkeydown="if(event.key==='Enter') findNext()">
+    <div id="searchPanel" class="hidden bg-gray-850 p-2 border-b border-gray-800 flex flex-col space-y-2 z-10">
+    <div class="flex items-center space-x-2">
+        <div class="relative flex-1">
+            <input id="searchInput" type="text" placeholder="Suchen..." 
+                   class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 pr-6 text-xs text-white focus:outline-none focus:border-blue-500" 
+                   oninput="updateSearch()" onkeydown="if(event.key==='Enter') findNext()">
+            <button onclick="clearSearch()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white text-xs">✕</button>
+        </div>
         <button id="searchFuncBtn" onclick="toggleFunctionSearch()" class="bg-gray-800 hover:bg-gray-700 text-gray-400 font-bold w-8 h-7 flex items-center justify-center rounded text-xs transition-colors">ƒ</button>
-        <span id="searchStatus" class="text-[10px] text-gray-500">0/0</span>
+        <span id="searchStatus" class="text-[10px] text-gray-500 min-w-[30px]">0/0</span>
         <button onclick="findPrev()" class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs">◀</button>
         <button onclick="findNext()" class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs">▶</button>
     </div>
+    <div id="searchHistory" class="flex space-x-2 overflow-x-auto pb-1">
+        </div>
+</div>
 
     <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
         <div id="editorContainer" class="w-full border-b md:border-b-0 md:border-r border-gray-800 relative">
@@ -686,10 +695,19 @@ inputmode="none"></textarea>
         }
 
         function updateSearch() {
-    const query = document.getElementById('searchInput').value.trim();
+    const input = document.getElementById('searchInput');
+    const query = input.value.trim();
     const text = editorEl.value;
     searchMatches = [];
     currentSearchIndex = -1;
+
+    // --- NEU: Historie-Logik ---
+    // Wir warten 1,5 Sekunden nach dem Tippen, bevor wir den Begriff in die Top 3 aufnehmen
+    clearTimeout(window.historyTimer);
+    if (query.length >= 2) {
+        window.historyTimer = setTimeout(() => addToHistory(query), 1500);
+    }
+    // ---------------------------
 
     if (!query || document.getElementById('searchPanel').classList.contains('hidden')) { 
         backdropEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
@@ -746,6 +764,51 @@ inputmode="none"></textarea>
     }
     renderHighlights();
 } // <-- Diese Klammer hat in deinem Post gefehlt!
+
+let searchHistory = JSON.parse(localStorage.getItem('sc_searchHistory') || "[]");
+
+function clearSearch() {
+    const input = document.getElementById('searchInput');
+    input.value = '';
+    input.focus();
+    updateSearch();
+}
+
+// Speichert den Begriff in der Historie (wird bei Enter oder Fokus-Verlust gerufen)
+function addToHistory(query) {
+    if (!query || query.length < 2) return;
+    
+    // Duplikate entfernen
+    searchHistory = searchHistory.filter(h => h !== query);
+    // Vorne hinzufügen
+    searchHistory.unshift(query);
+    // Auf 3 begrenzen
+    if (searchHistory.length > 3) searchHistory.pop();
+    
+    localStorage.setItem('sc_searchHistory', JSON.stringify(searchHistory));
+    renderHistory();
+}
+
+function renderHistory() {
+    const container = document.getElementById('searchHistory');
+    container.innerHTML = '';
+    
+    searchHistory.forEach(term => {
+        const badge = document.createElement('button');
+        badge.className = "bg-gray-700 hover:bg-blue-900/50 text-[10px] px-2 py-0.5 rounded text-gray-300 border border-gray-600 transition truncate max-w-[100px]";
+        badge.innerText = term;
+        badge.onclick = () => {
+    const input = document.getElementById('searchInput');
+    input.value = term;
+    input.focus(); // Setzt den Fokus zurück, damit man direkt weitertippen kann
+    updateSearch();
+};
+        container.appendChild(badge);
+    });
+}
+
+// Initial beim Laden einmal rendern
+renderHistory();
 
 function renderHighlights() {
     const query = document.getElementById('searchInput').value;
