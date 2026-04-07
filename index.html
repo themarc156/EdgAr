@@ -16,308 +16,278 @@
     <title>EdgAr - Mobile IDE v3.9.2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { overflow: hidden; touch-action: manipulation; height: 100dvh; background-color: #090d14; }
-        #editorContainer { height: calc(100dvh - 120px); position: relative; overflow: hidden; }
-        .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; background: #1f2937; }
-        input[type="file"] { display: none; }
-        
-        /* Gemeinsame Basis für Editor und Hintergrund */
-#mainEditor, #searchBackdrop {
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 0.875rem;
-    line-height: 1.5rem;
-    tab-size: 4;
-    white-space: pre;
-    overflow-wrap: normal;
-    padding: 1rem 1rem 1rem 3.5rem !important;
-    margin: 0;
-    border: none;
-    width: 100%;
-    height: 100%;
-    -webkit-text-size-adjust: none;
+    /* 1. BASIS-LAYOUT */
+    body { 
+        overflow: hidden; 
+        touch-action: manipulation; 
+        height: 100dvh; 
+        background-color: #090d14; 
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #editorContainer { 
+        flex: 1; 
+        position: relative; 
+        overflow: hidden; 
+        background: #0d1117;
+    }
+
+    /* 2. TEXTAREAS (Editor & KI) */
+    #mainEditor, #aiInput {
+        width: 100%;
+        height: 100%;
+        outline: none;
+        resize: none;
+        border: none;
+        box-sizing: border-box;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        line-height: 1.5;
+        -webkit-text-size-adjust: none;
+    }
+
+    /* Editor-spezifisch (mit Platz für Zeilennummern) */
+    #mainEditor, #searchBackdrop {
+        position: absolute;
+        top: 0;
+        left: 0;
+        padding: 1rem 1rem 1rem 3.5rem !important;
+        tab-size: 4;
+        white-space: pre;
+        overflow-wrap: normal;
+    }
+
+    #mainEditor {
+        z-index: 2;
+        background: transparent !important;
+        color: white;
+        caret-color: #3b82f6;
+        user-select: text !important;
+        -webkit-user-select: text !important;
+        touch-action: pan-y !important;
+    }
+
+    #searchBackdrop {
+        z-index: 1;
+        background: #090d14;
+        color: transparent;
+        pointer-events: none !important;
+        user-select: none;
+    }
+
+    /* 3. SCHRIFTGRÖSSEN (Mobile First) */
+    #mainEditor, #aiInput {
+        font-size: 13px;
+    }
+
+    /* Optimierung für Desktop (ab 1024px) */
+    @media (min-width: 1024px) {
+    #mainEditor, #lineNumbers { font-size: 15px; } /* Beide anpassen! */
+    #aiInput { font-size: 14px; height: 100% !important; }
 }
 
-#mainEditor {
-    position: relative;
-    z-index: 2;
-    background: transparent !important;
-    color: white;
-    outline: none;
-    resize: none;
-    caret-color: #3b82f6;
-    /* Erlaubt native Auswahl IMMER */
-    user-select: text !important;
-    -webkit-user-select: text !important;
-    /* pan-y verhindert, dass die Auswahl beim seitlichen Wischen abbricht */
-    touch-action: pan-y !important;
-}
-
-#searchBackdrop {
+    /* 4. UI-KOMPONENTEN */
+   #lineNumbers {
     position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 1;
-    background: #090d14;
-    color: transparent;
-    overflow: auto;
-    pointer-events: none !important;
-    user-select: none;
-    -webkit-user-select: none;
-}
-
-mark.search-highlight {
-    background-color: #facc15;
-    color: #000;
-    border-radius: 2px;
-}
-
-mark.search-current {
-    background-color: #f97316;
-    color: #000;
-}
-
-#lineNumbers {
-    position: absolute;
     left: 0;
     top: 0;
-    bottom: 0;
-    width: 3rem;
+    width: 3.5rem;
     background: #0d111a;
     color: #9ca3af;
     font-family: monospace;
-    font-size: 0.875rem;
+    font-size: 13px;
+    line-height: 1.5;
     text-align: right;
     padding-right: 0.5rem;
-    padding-top: 1rem;
+    padding-top: 1rem; /* MUSS identisch zu Editor padding-top sein! */
     user-select: none;
-    pointer-events: auto; 
     border-right: 1px solid #374151;
-    overflow: hidden;
-    z-index: 3;
-    touch-action: none; 
-    transition: background-color 0.2s ease;
+    z-index: 10;
+    white-space: pre;
+    
+    /* FIX: Die Box ist genau so hoch wie das sichtbare Fenster */
+    height: 100%; 
+    overflow: hidden; /* Verhindert eigenes Scroll-Verhalten */
+    pointer-events: none;
+    box-sizing: border-box;
 }
 
-.toast {
-    animation: fadeIn 0.3s ease-out, fadeOut 0.3s ease-in 1.7s forwards;
-    z-index: 100;
+    .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; background: #1f2937; }
+    input[type="file"] { display: none; }
+
+    /* Suche & Highlights */
+    mark.search-highlight { background-color: #facc15; color: #000; border-radius: 2px; }
+    mark.search-current { background-color: #f97316; color: #000; }
+
+    /* Toasts & Animationen */
+    .toast { animation: fadeIn 0.3s ease-out, fadeOut 0.3s ease-in 1.7s forwards; z-index: 100; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-10px); } }
+
+    /* Sperrmodus & Glow */
+    .selection-mode { caret-color: transparent !important; }
+    @keyframes pulse-blue {
+        0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+    }
+    .glow-border { border: 2px solid #3b82f6 !important; animation: pulse-blue 2s infinite; }
+
+    /* 5. SCROLLBARS */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1f2937; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+
+/* Verhindert das Standard-Scrollen der Zahlenbox durch den Nutzer, 
+   da dies nur per JS synchronisiert werden soll */
+#lineNumbers::-webkit-scrollbar {
+    display: none;
 }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes fadeOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-10px); } }
-
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #1f2937; }
-::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #4b5563; }
-
-/* OPTIMIERT: Modus für den Tastatur-Sperrmodus */
-.selection-mode {
-    /* Versteckt den blinkenden Cursor im Sperrmodus */
-    caret-color: transparent !important;
-    /* Erlaubt das native iOS/Android Kopieren-Menü */
-    -webkit-touch-callout: default !important;
-    /* Verhindert, dass das System beim langen Drücken UI-Aktionen auslöst, 
-       die den Fokus stehlen (außer Selektion) */
-    -webkit-user-drag: none;
+#lineNumbers {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
 
-
-/* Animation für den leuchtenden Rahmen */
-@keyframes pulse-blue {
-    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-    70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-}
-
-.glow-border {
-    border: 2px solid #3b82f6 !important;
-    animation: pulse-blue 2s infinite;
-}
-
-
-
-    </style>
+</style>
 </head>
-<body class="bg-gray-900 text-white flex flex-col font-sans">
+<body class="bg-gray-900 text-white flex flex-col font-sans h-[100dvh] overflow-hidden">
 
     <div id="toastContainer" class="fixed top-4 right-4 z-[60] flex flex-col space-y-2"></div>
 
-    <header class="h-14 px-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center shadow-md z-10">
-        <div class="flex items-center space-x-3">
-            <button onclick="toggleSidebar()" class="text-white text-xl hover:text-gray-300 transition">☰</button>
-            <h1 class="text-base font-bold text-blue-400 flex items-baseline">
-                Edg<span class="text-white">Ar</span> <span class="text-[10px] text-gray-500 uppercase ml-1 tracking-wider">IDE</span>
-            </h1>
-        </div>
-        
-        <div class="flex items-center space-x-1 h-9">
-            <button onclick="toggleSearch()" class="bg-gray-700 hover:bg-gray-600 w-9 h-full flex items-center justify-center rounded text-sm transition">🔍</button>
-            <button onclick="formatCurrentCode()" class="bg-gray-700 hover:bg-gray-600 w-9 h-full flex items-center justify-center rounded text-sm transition">🪄</button>
-            <button id="lockBtn" onclick="toggleEditMode()" class="bg-gray-700 hover:bg-gray-600 w-9 h-full flex items-center justify-center rounded text-base transition-colors">⌨️</button>
-            <button onclick="runProject()" class="bg-green-600 hover:bg-green-500 px-3 h-full flex items-center justify-center rounded text-xs font-bold shadow-lg transition">Run</button>
-        </div>
-    </header>
-
     <div id="sidebarOverlay" class="hidden fixed inset-0 bg-black/70 z-50" onclick="toggleSidebar()">
         <div id="sidebar" class="w-64 h-full bg-gray-900 shadow-[5px_0_25px_rgba(0,0,0,0.7)] flex flex-col transform -translate-x-full transition-transform duration-300" onclick="event.stopPropagation()">
-            <div class="h-14 border-b border-gray-700 flex items-center justify-between px-4 bg-gray-800">
+            <div class="h-14 border-b border-gray-700 flex items-center justify-between px-4 bg-gray-800 shrink-0">
                 <span class="font-bold text-sm text-gray-300 uppercase tracking-wider">Menü</span>
                 <button onclick="toggleSidebar()" class="text-gray-400 hover:text-white text-lg">✕</button>
             </div>
             
-            <nav class="flex-1 p-2 space-y-1 bg-gray-900 overflow-y-auto">
+            <nav class="flex-1 p-2 space-y-1 overflow-y-auto bg-gray-900">
                 <div class="px-4 py-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest">Datei</div>
                 <label class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md cursor-pointer transition">
                     <span class="text-yellow-500 text-lg">📁</span>
                     <span class="font-semibold">Datei öffnen</span>
                     <input type="file" id="fileInput" onchange="importFile(event)" multiple>
                 </label>
-                
                 <button onclick="saveAsProject(); toggleSidebar();" class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md transition text-left">
-                    <span class="text-green-500 text-lg">📥</span>
-                    <span class="font-semibold">Speichern unter...</span>
+                    <span class="text-green-500 text-lg">📥</span><span class="font-semibold ml-3">Speichern unter...</span>
                 </button>
-
                 <button onclick="splitHtmlStructure(); toggleSidebar();" class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md transition text-left">
-                    <span class="text-purple-500 text-lg">✂️</span>
-                    <span class="font-semibold">HTML zerlegen</span>
+                    <span class="text-purple-500 text-lg">✂️</span><span class="font-semibold ml-3">HTML zerlegen</span>
                 </button>
-                
+
                 <div class="border-b border-gray-700 my-2"></div>
+
                 <div class="px-4 py-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest">Bearbeiten</div>
-
                 <div class="grid grid-cols-2 gap-2 px-2 py-1">
-                    <button onclick="undo()" class="bg-gray-800 hover:bg-gray-700 py-2 rounded text-xs transition">↶ Undo</button>
-                    <button onclick="redo()" class="bg-gray-800 hover:bg-gray-700 py-2 rounded text-xs transition">↷ Redo</button>
+                    <button onclick="undo();" class="bg-gray-800 hover:bg-gray-700 py-2 rounded text-xs transition">↶ Undo</button>
+                    <button onclick="redo();" class="bg-gray-800 hover:bg-gray-700 py-2 rounded text-xs transition">↷ Redo</button>
                 </div>
-
-                <button onclick="selectAllCode()" class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md transition text-left">
-                    <span class="text-blue-400 text-lg">📋</span>
-                    <span class="font-semibold">Alles auswählen</span>
+                <button onclick="selectAllCode(); toggleSidebar();" class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md transition text-left">
+                    <span class="text-blue-400 text-lg">📋</span><span class="font-semibold ml-3">Alles auswählen</span>
                 </button>
-
-                <button id="smartSelectBtn" onclick="toggleSmartSelect()" class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md transition text-left">
+                <button id="smartSelectBtn" onclick="toggleSmartSelect(); toggleSidebar();" class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md transition text-left">
                     <span id="smartSelectIcon" class="text-gray-500 text-lg">🎯</span>
-                    <span class="font-semibold">Bereich-Auswahl</span>
+                    <span class="font-semibold ml-3">Bereich-Auswahl</span>
                     <span id="smartStatus" class="ml-auto text-[9px] bg-gray-700 text-white px-1 rounded">OFF</span>
                 </button>
 
                 <div class="border-b border-gray-700 my-2"></div>
+
                 <div class="px-4 py-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest">Quick Prompts</div>
-                
                 <div class="px-2 space-y-1">
-                    <button onclick="applyQuickPrompt('Bitte diesen Code komplett ersetzen.')" class="w-full text-left px-3 py-2 text-xs bg-gray-800 hover:bg-blue-900/40 border border-gray-700 rounded transition flex items-center">
+                    <button onclick="applyQuickPrompt('Bitte diesen Code komplett ersetzen.'); toggleSidebar();" class="w-full text-left px-3 py-2 text-xs bg-gray-800 hover:bg-blue-900/40 border border-gray-700 rounded transition flex items-center">
                         <span class="mr-2">🔄</span> Komplett ersetzen
                     </button>
-                    <button onclick="applyQuickPrompt('Suche im Code nach Fehlern und optimiere ihn.')" class="w-full text-left px-3 py-2 text-xs bg-gray-800 hover:bg-blue-900/40 border border-gray-700 rounded transition flex items-center">
+                    <button onclick="applyQuickPrompt('Suche im Code nach Fehlern.'); toggleSidebar();" class="w-full text-left px-3 py-2 text-xs bg-gray-800 hover:bg-blue-900/40 border border-gray-700 rounded transition flex items-center">
                         <span class="mr-2">🐞</span> Fehler suchen
                     </button>
-                    <button onclick="applyQuickPrompt('Kommentiere diesen Code ausführlich.')" class="w-full text-left px-3 py-2 text-xs bg-gray-800 hover:bg-blue-900/40 border border-gray-700 rounded transition flex items-center">
-                        <span class="mr-2">📝</span> Kommentieren
-                    </button>
-                </div>
-
-                <div class="border-b border-gray-700 my-2"></div>
-                <div class="px-4 py-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest">Editor-Status</div>
-                <div class="px-4 py-1 text-xs text-gray-400 flex justify-between">
-                    <span>Aktiv:</span>
-                    <span id="sidebarStatusTab" class="text-blue-400 font-mono">index.html</span>
                 </div>
             </nav>
-            
-            <div class="p-4 border-t border-gray-700 bg-gray-850 text-center text-xs text-gray-500">
-                EdgAr IDE v3.9.2
+            <div class="p-4 border-t border-gray-700 bg-gray-850 text-center text-xs text-gray-500">EdgAr IDE v3.9.2</div>
+        </div>
+    </div>
+
+    <div class="flex-1 flex overflow-hidden">
+        
+        <div class="w-full md:w-[70%] flex flex-col border-r border-gray-800 bg-[#0d1117]">
+            <header class="h-12 px-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center shrink-0 z-20">
+                <div class="flex items-center space-x-3">
+                    <button onclick="toggleSidebar()" class="text-white text-xl">☰</button>
+                    <h1 class="text-sm font-bold text-blue-400">Edg<span class="text-white">Ar</span></h1>
+                </div>
+                <div class="flex items-center space-x-1 h-8">
+                    <button onclick="toggleSearch()" class="bg-gray-700 hover:bg-gray-600 w-8 h-full rounded text-sm transition">🔍</button>
+                    <button onclick="formatCurrentCode()" class="bg-gray-700 hover:bg-gray-600 w-8 h-full rounded text-sm transition">🪄</button>
+                    <button id="lockBtn" onclick="toggleEditMode()" class="bg-gray-700 hover:bg-gray-600 w-8 h-full rounded text-base">⌨️</button>
+                    <button onclick="runProject()" class="bg-green-600 hover:bg-green-500 px-3 h-full rounded text-[10px] font-bold uppercase ml-1">Run</button>
+                </div>
+            </header>
+
+            <div class="bg-gray-800 flex text-[10px] font-mono border-b border-gray-700 overflow-x-auto shrink-0 z-20">
+                <button onclick="switchTab('html')" id="tab-html" class="px-4 py-2 border-r border-gray-700 hover:bg-gray-700 transition tab-active">index.html</button>
+                <button onclick="switchTab('css')" id="tab-css" class="px-4 py-2 border-r border-gray-700 hover:bg-gray-700 transition">style.css</button>
+                <button onclick="switchTab('js')" id="tab-js" class="px-4 py-2 border-r border-gray-700 hover:bg-gray-700 transition">script.js</button>
+            </div>
+
+            <div id="searchPanel" class="hidden bg-gray-850 p-2 border-b border-gray-800 flex flex-col space-y-2 z-30 shrink-0 shadow-xl">
+                <div class="flex items-center space-x-2">
+                    <div class="relative flex-1">
+                        <input id="searchInput" type="text" placeholder="Suchen..." class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 pr-6 text-xs text-white outline-none focus:border-blue-500" oninput="updateSearch()" onkeydown="if(event.key==='Enter') findNext()">
+                        <button onclick="clearSearch()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white text-xs">✕</button>
+                    </div>
+                    <button id="searchFuncBtn" onclick="toggleFunctionSearch()" class="bg-gray-800 hover:bg-gray-700 text-gray-400 font-bold w-8 h-7 flex items-center justify-center rounded text-xs">ƒ</button>
+                    <span id="searchStatus" class="text-[10px] text-gray-500 min-w-[30px]">0/0</span>
+                    <button onclick="findPrev()" class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs">◀</button>
+                    <button onclick="findNext()" class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs">▶</button>
+                </div>
+                <div id="searchHistory" class="flex space-x-2 overflow-x-auto pb-1"></div>
+            </div>
+
+            <div id="editorContainer" class="flex-1 relative overflow-hidden bg-[#0d1117]">
+                <div id="lineNumbers">1</div>
+                <div id="searchBackdrop"></div>
+                <textarea id="mainEditor" spellcheck="false" inputmode="none" oninput="onEditorInput(event)" onscroll="onEditorScroll()" onclick="handleEditorClick()" placeholder="Code hier eingeben..."></textarea>
             </div>
         </div>
-    </div>
 
-    <div class="bg-gray-800 flex text-xs font-mono border-b border-gray-700 overflow-x-auto z-10">
-        <button onclick="switchTab('html')" id="tab-html" class="px-4 py-3 border-r border-gray-700 hover:bg-gray-700 transition tab-active">index.html</button>
-        <button onclick="switchTab('css')" id="tab-css" class="px-4 py-3 border-r border-gray-700 hover:bg-gray-700 transition">style.css</button>
-        <button onclick="switchTab('js')" id="tab-js" class="px-4 py-3 border-r border-gray-700 hover:bg-gray-700 transition">script.js</button>
-    </div>
-
-    <div id="searchPanel" class="hidden bg-gray-850 p-2 border-b border-gray-800 flex flex-col space-y-2 z-10">
-    <div class="flex items-center space-x-2">
-        <div class="relative flex-1">
-            <input id="searchInput" type="text" placeholder="Suchen..." 
-                   class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 pr-6 text-xs text-white focus:outline-none focus:border-blue-500" 
-                   oninput="updateSearch()" onkeydown="if(event.key==='Enter') findNext()">
-            <button onclick="clearSearch()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white text-xs">✕</button>
-        </div>
-        <button id="searchFuncBtn" onclick="toggleFunctionSearch()" class="bg-gray-800 hover:bg-gray-700 text-gray-400 font-bold w-8 h-7 flex items-center justify-center rounded text-xs transition-colors">ƒ</button>
-        <span id="searchStatus" class="text-[10px] text-gray-500 min-w-[30px]">0/0</span>
-        <button onclick="findPrev()" class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs">◀</button>
-        <button onclick="findNext()" class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs">▶</button>
-    </div>
-    <div id="searchHistory" class="flex space-x-2 overflow-x-auto pb-1">
-        </div>
-</div>
-
-    <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-        <div id="editorContainer" class="w-full border-b md:border-b-0 md:border-r border-gray-800 relative">
-            <div id="lineNumbers">1</div>
-            <div id="searchBackdrop"></div>
-            <textarea id="mainEditor" 
-                placeholder="Code hier eingeben..."
-                oninput="onEditorInput(event)"
-                onscroll="onEditorScroll()"
-                onclick="handleEditorClick()"
-                spellcheck="false"
-inputmode="none"></textarea>
-        </div>
-
-        <div class="h-auto md:h-full md:w-1/3 flex flex-col p-3 space-y-2 bg-gray-900 border-t md:border-t-0 border-gray-700 z-10">
-            <div class="flex justify-between items-center h-9 mb-1">
+        <div class="hidden md:flex w-[30%] flex-col bg-gray-900 border-l border-gray-800 shadow-2xl overflow-hidden">
+            <div class="h-12 bg-gray-850 border-b border-gray-800 flex justify-between items-center px-3 shrink-0">
                 <h2 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">KI-Input</h2>
-                <div class="flex items-center space-x-2 h-full">
-                    <button onclick="clearAiInput()" class="text-xs text-red-400 hover:text-red-300 uppercase px-1 font-semibold">Clear</button>
-                    <button onclick="toggleSymbols()" class="bg-gray-700 hover:bg-gray-600 px-2.5 h-full rounded text-xs font-bold text-blue-300 transition flex items-center justify-center min-w-[32px]">{..}</button>
-                    <button onclick="setReplaceTarget()" class="bg-gray-700 hover:bg-gray-600 px-3 h-full rounded text-sm font-bold text-yellow-400 transition flex items-center justify-center min-w-[32px]" title="Ersetzt markierten Code">⇄</button>
-
-<select id="aiMode" class="bg-gray-700 px-2 h-full rounded text-xs">
-  <option value="fast">⚡</option>
-  <option value="smart" selected>🧠</option>
-  <option value="cheap">💰</option>
-</select>
-
-<button onclick="addPrompt()" class="bg-gray-700 px-2 h-full rounded text-xs">+ 📦</button>
-
-<button onclick="sendAI()" class="bg-purple-600 hover:bg-purple-500 px-3 h-full rounded text-xs font-bold uppercase transition flex items-center justify-center">
-🚀
-</button>
-
-
-                    <button onclick="smartMerge()" class="bg-blue-600 hover:bg-blue-500 px-3 h-full rounded text-xs font-bold uppercase transition flex items-center justify-center">Merge</button>
+                <div class="flex items-center space-x-2">
+                    <button onclick="clearAiInput()" class="text-[10px] text-red-400 font-bold uppercase hover:text-red-300 transition">Clear</button>
+                    <select id="aiMode" class="bg-gray-800 text-white text-[10px] rounded px-1 border border-gray-700 outline-none">
+                        <option value="fast">⚡</option>
+                        <option value="smart" selected>🧠</option>
+                        <option value="cheap">💰</option>
+                    </select>
                 </div>
             </div>
             
-            <div id="symbolsPanel" class="hidden flex space-x-2 bg-gray-850 p-1.5 rounded-md border border-gray-800">
-                <button onclick="insertChar('{')" class="bg-gray-800 px-3 py-1 rounded text-blue-300 font-bold text-xs flex-1 min-h-[32px]">{</button>
-                <button onclick="insertChar('}')" class="bg-gray-800 px-3 py-1 rounded text-blue-300 font-bold text-xs flex-1 min-h-[32px]">}</button>
-                <button onclick="insertChar(';')" class="bg-gray-800 px-3 py-1 rounded text-blue-300 font-bold text-xs flex-1 min-h-[32px] Lucida Console">;</button>
-                <button onclick="insertChar('=>')" class="bg-gray-800 px-3 py-1 rounded text-blue-300 font-bold text-xs flex-1 min-h-[32px]">=&gt;</button>
-            </div>
-            
-            <textarea id="aiInput"
-    onkeydown="handleKey(event)" 
-                class="w-full h-10 md:h-[calc(100%-2rem)] bg-gray-950 border border-gray-700 rounded-md p-2 text-xs font-mono text-blue-100 outline-none focus:border-blue-500 overflow-y-auto" 
-                placeholder="Hier Code einfügen..."
-                oninput="autoResizeAiInput(this)"
-                spellcheck="false"></textarea>
-        </div>
-
-        <div id="previewDrawer" class="hidden fixed inset-0 bg-gray-900 flex flex-col z-50">
-            <div class="h-10 bg-gray-800 border-b border-gray-700 flex justify-between items-center px-4">
-                <h3 class="font-bold text-xs text-green-400">Live-Vorschau</h3>
-                <div class="flex space-x-2">
-                    <button onclick="toggleBrowserFullscreen()" class="text-xs text-gray-400 hover:text-white px-2">⛶</button>
-                    <button onclick="closePreview()" class="bg-red-600 hover:bg-red-500 w-7 h-7 flex items-center justify-center rounded text-sm font-bold transition">✕</button>
+            <div class="flex-1 flex flex-col p-2 space-y-2 overflow-hidden">
+                <div class="flex items-center space-x-1 h-8 shrink-0">
+                    <button onclick="toggleSymbols()" class="bg-gray-800 hover:bg-gray-700 flex-1 h-full rounded text-[10px] font-bold text-blue-300 border border-gray-700 transition flex items-center justify-center">{..}</button>
+                    <button onclick="setReplaceTarget()" class="bg-gray-800 hover:bg-gray-700 flex-1 h-full rounded text-sm text-yellow-400 border border-gray-700 transition flex items-center justify-center" title="Ersetzt markierten Code">⇄</button>
+                    <button onclick="addPrompt()" class="bg-gray-800 hover:bg-gray-700 flex-1 h-full rounded text-xs border border-gray-700 transition flex items-center justify-center">+ 📦</button>
+                    <button onclick="sendAI()" class="bg-purple-600 hover:bg-purple-500 px-3 h-full rounded text-xs font-bold uppercase transition flex items-center justify-center">🚀</button>
+                    <button onclick="smartMerge()" class="bg-blue-600 hover:bg-blue-500 px-3 h-full rounded text-[10px] font-bold uppercase transition flex items-center justify-center">Merge</button>
                 </div>
+
+                <div id="symbolsPanel" class="hidden flex space-x-1 bg-gray-950 p-1 rounded border border-gray-800 shrink-0">
+                    <button onclick="insertChar('{')" class="bg-gray-800 py-1 rounded text-blue-300 text-[10px] flex-1 font-bold">{</button>
+                    <button onclick="insertChar('}')" class="bg-gray-800 py-1 rounded text-blue-300 text-[10px] flex-1 font-bold">}</button>
+                    <button onclick="insertChar(';')" class="bg-gray-800 py-1 rounded text-blue-300 text-[10px] flex-1 font-bold">;</button>
+                </div>
+
+                <textarea id="aiInput" 
+                    class="w-full flex-1 bg-gray-950 border border-gray-700 rounded p-2 text-xs font-mono text-blue-100 outline-none focus:border-blue-500 resize-none overflow-y-auto" 
+                    placeholder="KI Prompt hier eingeben..." 
+                    spellcheck="false"></textarea>
             </div>
-            <iframe id="previewFrame" class="w-full flex-1 bg-white border-none"></iframe>
         </div>
-    </main>
+    </div>
+</body>
 
     <script>
         let activeTab = localStorage.getItem('sc_activeTab') || 'html';
@@ -451,12 +421,18 @@ inputmode="none"></textarea>
 
 
         function autoResizeAiInput(el) {
-            if (window.innerWidth < 768) {
-                el.style.height = '40px'; 
-                const newHeight = Math.min(el.scrollHeight, 150); 
-                el.style.height = newHeight + 'px';
-            }
-        }
+    // Wenn wir auf einem Tablet/Smartphone sind (Breite < 768px)
+    if (window.innerWidth < 768) {
+        el.style.height = '40px'; 
+        const newHeight = Math.min(el.scrollHeight, 150); 
+        el.style.height = newHeight + 'px';
+    } else {
+        // Auf dem PC/Laptop: 
+        // Wir entfernen die festen Pixel-Werte, damit "flex-1" (CSS) 
+        // das Feld automatisch auf die volle verfügbare Höhe streckt.
+        el.style.height = ''; 
+    }
+}
 
         function showToast(msg, type = "blue") {
             const container = document.getElementById('toastContainer');
@@ -518,17 +494,42 @@ inputmode="none"></textarea>
 
 
         function updateLineNumbers() {
-            const lines = editorEl.value.split('\n').length;
-            let numStr = '';
-            for (let i = 1; i <= lines; i++) { numStr += i + '<br>'; }
-            lineNumbersEl.innerHTML = numStr;
-        }
+    if (!editorEl || !lineNumbersEl) return;
+    
+    const lines = editorEl.value.split('\n');
+    const lineCount = lines.length;
+    
+    // 1. Zahlen generieren
+    let numStr = '';
+    for (let i = 1; i <= lineCount; i++) {
+        numStr += i + '\n';
+    }
+    lineNumbersEl.textContent = numStr;
 
-        function syncScroll() {
-            backdropEl.scrollTop = editorEl.scrollTop;
-            backdropEl.scrollLeft = editorEl.scrollLeft;
-            lineNumbersEl.scrollTop = editorEl.scrollTop;
-        }
+    // 2. WICHTIG: Den internen Scroll-Versatz der Zahlenbox eliminieren
+    // Das verhindert, dass die Zählung plötzlich bei 82 startet.
+    lineNumbersEl.scrollTop = 0;
+
+    // 3. Die vertikale Position an den Editor koppeln
+    // Falls du in syncScroll() bereits scrollTop setzt, reicht das hier:
+    syncScroll();
+}
+
+   function syncScroll() {
+    if (!editorEl) return;
+
+    // 1. Synchronisiere die Zeilennummern (vertikal)
+    if (lineNumbersEl) {
+        // Wir setzen die Position hart auf den Wert des Editors
+        lineNumbersEl.scrollTop = editorEl.scrollTop;
+    }
+
+    // 2. Synchronisiere das Such-Backdrop (vertikal & horizontal)
+    if (backdropEl) {
+        backdropEl.scrollTop = editorEl.scrollTop;
+        backdropEl.scrollLeft = editorEl.scrollLeft;
+    }
+}
 
         function onEditorScroll() {
             syncScroll();
@@ -869,20 +870,44 @@ function renderHighlights() {
         function updateCurrentFile() { files[activeTab] = editorEl.value; localStorage.setItem('sc_project', JSON.stringify(files)); }
 
         function switchTab(tab, isInitial = false) {
-            if (!isInitial) updateCurrentFile();
-            document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.remove('tab-active'));
-            document.getElementById('tab-' + tab).classList.add('tab-active');
-            activeTab = tab;
-            localStorage.setItem('sc_activeTab', activeTab);
-            editorEl.value = files[activeTab];
-            backdropEl.innerText = files[activeTab];
-            if (!isInitial) showToast(`Tab: ${tab.toUpperCase()}`, "blue");
-            document.getElementById('sidebarStatusTab').innerText = `${tab === 'html' ? 'index.html' : tab === 'css' ? 'style.css' : 'script.js'}`;
-            updateSearch();
-            updateLineNumbers();
-            if (undoStacks[activeTab].length === 0) { undoStacks[activeTab].push(files[activeTab]); }
-            setTimeout(() => { editorEl.scrollTop = scrollPositions[tab] || 0; syncScroll(); }, 10);
-        }
+    if (!isInitial) updateCurrentFile();
+    
+    // 1. Visuelles Feedback (Tabs)
+    document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.remove('tab-active'));
+    const activeTabEl = document.getElementById('tab-' + tab);
+    if (activeTabEl) activeTabEl.classList.add('tab-active');
+    
+    activeTab = tab;
+    localStorage.setItem('sc_activeTab', activeTab);
+    
+    // 2. Inhalt in den Editor laden
+    const content = files[activeTab] || "";
+    editorEl.value = content;
+    backdropEl.innerText = content; // Wichtig für das Such-Highlighting
+    
+    if (!isInitial) showToast(`Tab: ${tab.toUpperCase()}`, "blue");
+    
+    // Status-Anzeige aktualisieren
+    const statusText = tab === 'html' ? 'index.html' : tab === 'css' ? 'style.css' : 'script.js';
+    document.getElementById('sidebarStatusTab').innerText = statusText;
+    
+    // 3. WICHTIG: Erst Nummern generieren, dann Scrollen
+    updateSearch();
+    updateLineNumbers(); 
+    
+    if (undoStacks[activeTab].length === 0) { 
+        undoStacks[activeTab].push(content); 
+    }
+
+    // 4. Scroll-Position wiederherstellen
+    // Erhöht auf 50ms, damit der Browser Zeit hat, die neuen Zeilennummern zu rendern
+    setTimeout(() => { 
+        const targetScroll = scrollPositions[tab] || 0;
+        editorEl.scrollTop = targetScroll;
+        // syncScroll sorgt dafür, dass Zeilennummern und Backdrop mitspringen
+        syncScroll(); 
+    }, 50);
+}
 
         function splitHtmlStructure() {
             let sourceHtml = files.html;
@@ -1221,6 +1246,31 @@ Rules:
             }
         });
 
+// Aktualisiert die Zahlen, wenn du Text eingibst oder löschst
+editorEl.addEventListener('input', () => {
+    updateLineNumbers();
+});
+
+// 1. Zentrale Scroll-Funktion
+function onEditorScroll() {
+    // Synchronisiere die Positionen
+    if (lineNumbersEl) {
+        lineNumbersEl.scrollTop = editorEl.scrollTop;
+    }
+    if (backdropEl) {
+        backdropEl.scrollTop = editorEl.scrollTop;
+        backdropEl.scrollLeft = editorEl.scrollLeft;
+    }
+
+    // Speichere die Position für den Tab-Wechsel
+    scrollPositions[activeTab] = editorEl.scrollTop;
+    localStorage.setItem('sc_scrollPositions', JSON.stringify(scrollPositions));
+}
+
+// 2. Sicherstellen, dass der Listener nur EINMAL gebunden ist
+// Entferne manuelle addEventListener('scroll', ...) Aufrufe, 
+// da das HTML Attribut onscroll="onEditorScroll()" bereits den Job macht.
+
 editorEl.addEventListener('beforeinput', (e) => {
     if (isReadOnly) {
         e.preventDefault(); // Das ist jetzt dein "virtuelles" Readonly
@@ -1245,23 +1295,47 @@ editorEl.addEventListener('keydown', (e) => {
 });
 
 // --- INITIALISIERUNG BEIM START ---
+// --- INITIALISIERUNG BEIM START ---
 function setupInitialState() {
     isReadOnly = true; 
     const btn = document.getElementById('lockBtn');
     
+    // Editor in den Markier-Modus versetzen
     editorEl.setAttribute('inputmode', 'none');
     editorEl.classList.add('selection-mode');
     
-    // IMMER das Tastatur-Icon anzeigen
-    btn.innerText = "⌨️"; 
-    btn.classList.remove('glow-border', 'bg-blue-600');
-    btn.classList.add('bg-gray-700', 'text-white');
-    
+    if (btn) {
+        btn.innerText = "⌨️"; 
+        btn.classList.remove('glow-border', 'bg-blue-600');
+        btn.classList.add('bg-gray-700', 'text-white');
+    }
+
+    // 1. Sofortiger Versuch (für die Optik)
     updateLineNumbers();
+
+    // 2. Erzwungener Versuch nach Pufferzeit
+    setTimeout(() => {
+        // FORCE: Wir stellen sicher, dass der Text wirklich im Editor geladen ist
+        if (files[activeTab]) {
+            editorEl.value = files[activeTab];
+        }
+        
+        updateLineNumbers(); // Jetzt generiert er die Zahlen basierend auf echtem Inhalt
+        
+        const lastPos = scrollPositions[activeTab] || 0;
+        editorEl.scrollTop = lastPos;
+        
+        // Synchronisiert Backdrop und Zeilennummern sofort
+        syncScroll(); 
+        console.log("System bereit: " + editorEl.value.split('\n').length + " Zeilen.");
+    }, 200); // 200ms ist sicherer, damit der DOM stabil ist
 }
 
+// Die Listener müssen aktiv bleiben:
+editorEl.addEventListener('scroll', onEditorScroll);
+editorEl.addEventListener('input', onEditorInput);
 
-// Führe die Funktion sofort aus
+// Initialisierung starten
 setupInitialState();
 
 
