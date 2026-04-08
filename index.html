@@ -43,38 +43,49 @@
         border: none;
         box-sizing: border-box;
         font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        line-height: 1.5;
+        line-height: 19.5px;
         -webkit-text-size-adjust: none;
     }
 
     /* Editor-spezifisch (mit Platz für Zeilennummern) */
-    #mainEditor, #searchBackdrop {
-        position: absolute;
-        top: 0;
-        left: 0;
-        padding: 1rem 1rem 1rem 3.5rem !important;
-        tab-size: 4;
-        white-space: pre;
-        overflow-wrap: normal;
-    }
+#mainEditor, #searchBackdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    /* WICHTIG: Padding, Font und Line-Height müssen auf das Pixel genau identisch sein! */
+    padding: 1rem 1rem 1rem 3.5rem !important;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 19.5px;
+    tab-size: 4;
+    white-space: pre;
+    overflow-wrap: normal;
+    box-sizing: border-box;
+}
 
-    #mainEditor {
-        z-index: 2;
-        background: transparent !important;
-        color: white;
-        caret-color: #3b82f6;
-        user-select: text !important;
-        -webkit-user-select: text !important;
-        touch-action: pan-y !important;
-    }
+#mainEditor {
+    z-index: 2;
+    background: transparent !important; /* Muss durchsichtig sein */
+    color: white;
+    caret-color: #3b82f6;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+    touch-action: pan-y !important;
+    border: none; /* KEIN RAHMEN HIER */
+}
 
-    #searchBackdrop {
-        z-index: 1;
-        background: #090d14;
-        color: transparent;
-        pointer-events: none !important;
-        user-select: none;
-    }
+#searchBackdrop {
+    z-index: 1;
+    background: #0d1117; /* Dein Hintergrund */
+    color: transparent !important;
+    pointer-events: none !important;
+    user-select: none;
+    overflow: hidden;
+    /* FIX: Wir entfernen den Rahmen hier, da er das Backdrop um 2px verschiebt! */
+    border: none; 
+}
 
     /* 3. SCHRIFTGRÖSSEN (Mobile First) */
     #mainEditor, #aiInput {
@@ -83,8 +94,8 @@
 
     /* Optimierung für Desktop (ab 1024px) */
     @media (min-width: 1024px) {
-    #mainEditor, #lineNumbers { font-size: 15px; } /* Beide anpassen! */
-    #aiInput { font-size: 14px; height: 100% !important; }
+    #mainEditor, #lineNumbers { font-size: 13px; } /* Beide anpassen! */
+    #aiInput { font-size: 13px; height: 100% !important; }
 }
 
     /* 4. UI-KOMPONENTEN */
@@ -97,7 +108,7 @@
     color: #9ca3af;
     font-family: monospace;
     font-size: 13px;
-    line-height: 1.5;
+    line-height: 19.5px;
     text-align: right;
     padding-right: 0.5rem;
     padding-top: 1rem; /* MUSS identisch zu Editor padding-top sein! */
@@ -109,6 +120,7 @@
     /* FIX: Die Box ist genau so hoch wie das sichtbare Fenster */
     height: 100%; 
     overflow: hidden; /* Verhindert eigenes Scroll-Verhalten */
+will-change: transform; /* wichtig */
     pointer-events: none;
     box-sizing: border-box;
 }
@@ -117,8 +129,17 @@
     input[type="file"] { display: none; }
 
     /* Suche & Highlights */
-    mark.search-highlight { background-color: #facc15; color: #000; border-radius: 2px; }
-    mark.search-current { background-color: #f97316; color: #000; }
+mark.search-highlight { 
+    background-color: rgba(250, 204, 21, 0.5) !important; /* Halbtransparentes Gelb */
+    color: transparent !important; 
+    display: inline; /* Zurück auf inline für besseren Textfluss */
+    border-radius: 2px;
+}
+
+mark.search-current { 
+    background-color: rgba(59, 130, 246, 0.8) !important; /* Kräftiges Blau */
+    color: transparent !important;
+}
 
     /* Toasts & Animationen */
     .toast { animation: fadeIn 0.3s ease-out, fadeOut 0.3s ease-in 1.7s forwards; z-index: 100; }
@@ -321,7 +342,9 @@
         const lineNumbersEl = document.getElementById('lineNumbers');
 
         editorEl.value = files[activeTab];
-        backdropEl.innerText = files[activeTab];
+backdropEl.innerText = files[activeTab];
+
+updateLineNumbers(); // ← DAS FEHLT
 
         undoStacks[activeTab].push(files[activeTab]);
 
@@ -496,38 +519,33 @@
         function updateLineNumbers() {
     if (!editorEl || !lineNumbersEl) return;
     
-    const lines = editorEl.value.split('\n');
-    const lineCount = lines.length;
+    const lineCount = editorEl.value.split('\n').length;
     
-    // 1. Zahlen generieren
-    let numStr = '';
-    for (let i = 1; i <= lineCount; i++) {
-        numStr += i + '\n';
-    }
-    lineNumbersEl.textContent = numStr;
+    let nums = [];
+for (let i = 1; i <= lineCount; i++) {
+    nums.push(i);
+}
+lineNumbersEl.textContent = nums.join('\n');
 
-    // 2. WICHTIG: Den internen Scroll-Versatz der Zahlenbox eliminieren
-    // Das verhindert, dass die Zählung plötzlich bei 82 startet.
-    lineNumbersEl.scrollTop = 0;
-
-    // 3. Die vertikale Position an den Editor koppeln
-    // Falls du in syncScroll() bereits scrollTop setzt, reicht das hier:
+    // Nur sync, kein Reset!
     syncScroll();
 }
 
    function syncScroll() {
     if (!editorEl) return;
 
-    // 1. Synchronisiere die Zeilennummern (vertikal)
+    const top = editorEl.scrollTop;
+    const left = editorEl.scrollLeft;
+
+    // 1. Zeilennummern schieben
     if (lineNumbersEl) {
-        // Wir setzen die Position hart auf den Wert des Editors
-        lineNumbersEl.scrollTop = editorEl.scrollTop;
+        lineNumbersEl.scrollTop = top; 
     }
 
-    // 2. Synchronisiere das Such-Backdrop (vertikal & horizontal)
+    // 2. Such-Backdrop schieben
     if (backdropEl) {
-        backdropEl.scrollTop = editorEl.scrollTop;
-        backdropEl.scrollLeft = editorEl.scrollLeft;
+        backdropEl.scrollTop = top;
+        backdropEl.scrollLeft = left;
     }
 }
 
@@ -538,6 +556,7 @@
         }
 
         let typingTimer;
+
         function onEditorInput(e) {
             if (!isReadOnly && e.inputType === 'insertText' && e.data) {
                 handleAutoClose(e.data);
@@ -570,39 +589,41 @@
             }
         }
 
-        function undo() {
-            const uStack = undoStacks[activeTab];
-            const rStack = redoStacks[activeTab];
-            if (uStack.length <= 1) { showToast("Nichts zum Rückgängig machen!", "blue"); return; }
-            const currentState = uStack.pop();
-            rStack.push(currentState);
-            const previousState = uStack[uStack.length - 1];
-            applyHistoryState(previousState);
-            showToast("Rückgängig gemacht", "blue");
-        }
+/* --- HISTORIE & NAVIGATION --- */
+function undo() {
+    const uStack = undoStacks[activeTab];
+    const rStack = redoStacks[activeTab];
+    if (uStack.length <= 1) { showToast("Nichts zum Rückgängig machen!", "blue"); return; }
+    const currentState = uStack.pop();
+    rStack.push(currentState);
+    const previousState = uStack[uStack.length - 1];
+    applyHistoryState(previousState);
+    showToast("Rückgängig gemacht", "blue");
+}
 
-        function redo() {
-            const uStack = undoStacks[activeTab];
-            const rStack = redoStacks[activeTab];
-            if (rStack.length === 0) { showToast("Nichts zum Wiederholen!", "blue"); return; }
-            const nextState = rStack.pop();
-            uStack.push(nextState);
-            applyHistoryState(nextState);
-            showToast("Wiederholt", "blue");
-        }
+function redo() {
+    const uStack = undoStacks[activeTab];
+    const rStack = redoStacks[activeTab];
+    if (rStack.length === 0) { showToast("Nichts zum Wiederholen!", "blue"); return; }
+    const nextState = rStack.pop();
+    uStack.push(nextState);
+    applyHistoryState(nextState);
+    showToast("Wiederholt", "blue");
+}
 
-        function applyHistoryState(code) {
-            const wasReadOnly = isReadOnly;
-            if (wasReadOnly) editorEl.readOnly = false;
-            editorEl.value = code;
-            files[activeTab] = code;
-            localStorage.setItem('sc_project', JSON.stringify(files));
-            updateLineNumbers();
-            updateSearch();
-            if (wasReadOnly) editorEl.readOnly = true;
-        }
+function applyHistoryState(code) {
+    const wasReadOnly = isReadOnly;
+    if (wasReadOnly) editorEl.readOnly = false;
+    editorEl.value = code;
+    files[activeTab] = code;
+    localStorage.setItem('sc_project', JSON.stringify(files));
+    updateLineNumbers();
+    updateSearch();
+    if (wasReadOnly) editorEl.readOnly = true;
+}
 
-        function formatCurrentCode() {
+/* --- FORMATIERUNG --- */
+function formatCurrentCode() {
     const wasLocked = isReadOnly;
     if (wasLocked) { editorEl.readOnly = false; }
     
@@ -610,46 +631,36 @@
     let formatted = '';
     let indentLevel = 0;
     
-    // 1. Schritt: Code in Zeilen zerlegen und unnötige Leerzeichen/Leerzeilen entfernen
     const lines = code.split('\n');
     
     for (let i = 0; i < lines.length; i++) {
         let trimmed = lines[i].trim();
-        
-        // Wenn die Zeile leer ist, ignorieren wir sie (wir setzen sie später strategisch neu)
         if (!trimmed) continue;
 
-        // Einrücken verringern, wenn Block endet
         if (trimmed.startsWith('}') || trimmed.startsWith('</')) { 
             indentLevel = Math.max(0, indentLevel - 1); 
         }
 
-        // --- STRATEGISCHE LEERZEILEN LOGIK ---
-        // Füge Leerzeile VOR wichtigen Blöcken ein (außer es ist die erste Zeile)
         const isBlockStart = trimmed.includes('function ') || 
                              trimmed.includes('=>') || 
                              (activeTab === 'css' && trimmed.includes('{')) ||
-                             (activeTab === 'html' && trimmed.startsWith('<div') || trimmed.startsWith('<section'));
+                             (activeTab === 'html' && (trimmed.startsWith('<div') || trimmed.startsWith('<section')));
 
         if (isBlockStart && formatted !== '') {
             formatted += '\n'; 
         }
 
-        // Die eigentliche Zeile mit korrektem Indent hinzufügen
         formatted += '  '.repeat(indentLevel) + trimmed + '\n';
 
-        // Einrücken erhöhen, wenn Block startet
         if ((trimmed.endsWith('{') || (trimmed.startsWith('<') && !trimmed.startsWith('</') && !trimmed.endsWith('/>') && !trimmed.includes('</')))) { 
             indentLevel++; 
         }
         
-        // Füge Leerzeile NACH schließenden Klammern ein
         if (trimmed === '}' || trimmed === '};') {
             formatted += '\n';
         }
     }
 
-    // Finale Bereinigung: Doppelte Leerzeilen zu einer machen
     editorEl.value = formatted.replace(/\n{3,}/g, '\n\n').trim() + '\n';
     
     updateCurrentFile();
@@ -660,29 +671,90 @@
     showToast("Code strukturiert ✨", "green");
 }
 
+/* --- SUCHE & FILTER --- */
+function toggleSymbols() { document.getElementById('symbolsPanel').classList.toggle('hidden'); }
 
-        function toggleSymbols() { document.getElementById('symbolsPanel').classList.toggle('hidden'); }
-        function toggleSearch() {
-            const panel = document.getElementById('searchPanel');
-            const input = document.getElementById('searchInput');
-            panel.classList.toggle('hidden');
-            if(!panel.classList.contains('hidden')) { input.focus(); updateSearch(); } 
-            else { renderHighlights(); }
-        }
+function toggleSearch() {
+    const panel = document.getElementById('searchPanel');
+    const input = document.getElementById('searchInput');
+    panel.classList.toggle('hidden');
+    if(!panel.classList.contains('hidden')) { 
+        input.focus(); 
+        updateSearch(); 
+    } else { 
+        renderHighlights(); 
+    }
+}
 
-        function toggleFunctionSearch() {
-            const btn = document.getElementById('searchFuncBtn');
-            isFunctionSearch = !isFunctionSearch;
-            if(isFunctionSearch) {
-                btn.classList.remove('bg-gray-800', 'text-gray-400');
-                btn.classList.add('bg-blue-600', 'text-white');
-                showToast("Funktions-Filter aktiv", "blue");
-            } else {
-                btn.classList.remove('bg-blue-600', 'text-white');
-                btn.classList.add('bg-gray-800', 'text-gray-400');
+function toggleFunctionSearch() {
+    const btn = document.getElementById('searchFuncBtn');
+    isFunctionSearch = !isFunctionSearch;
+    if(isFunctionSearch) {
+        btn.classList.remove('bg-gray-800', 'text-gray-400');
+        btn.classList.add('bg-blue-600', 'text-white');
+        showToast("Funktions-Filter aktiv", "blue");
+    } else {
+        btn.classList.remove('bg-blue-600', 'text-white');
+        btn.classList.add('bg-gray-800', 'text-gray-400');
+    }
+    updateSearch();
+}
+
+function updateSearch() {
+    const input = document.getElementById('searchInput');
+    const query = input.value.trim();
+    const text = editorEl.value;
+    searchMatches = [];
+    currentSearchIndex = -1;
+
+    clearTimeout(window.historyTimer);
+    if (query.length >= 2) {
+        window.historyTimer = setTimeout(() => addToHistory(query), 1500);
+    }
+
+    if (!query || document.getElementById('searchPanel').classList.contains('hidden')) { 
+        backdropEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+        document.getElementById('searchStatus').innerText = "0/0"; 
+        return; 
+    }
+
+    const textLower = text.toLowerCase();
+    let queryLower = query.toLowerCase();
+
+    if (isFunctionSearch) {
+        const q = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+        let regex;
+        if (activeTab === 'js') regex = new RegExp(`(?:function\\s+|const\\s+|let\\s+|var\\s+)[a-zA-Z0-9_$]*${q}[a-zA-Z0-9_$]*`, 'gi');
+        else if (activeTab === 'css') regex = new RegExp(`[.#][a-zA-Z0-9_-]*${q}[a-zA-Z0-9_-]*`, 'gi');
+        else if (activeTab === 'html') regex = new RegExp(`(?:<|id="|function\\s+|const\\s+|let\\s+|var\\s+)[a-zA-Z0-9_$]*${q}[a-zA-Z0-9_$]*`, 'gi');
+
+        if (regex) {
+            let match;
+            while ((match = regex.exec(text)) !== null) {
+                let keywordMatch = match[0].match(/^(?:function\\s+|const\\s+|let\\s+|var\\s+|<|id=")/i);
+                let offset = keywordMatch ? keywordMatch[0].length : 0;
+                searchMatches.push(match.index + offset);
             }
-            updateSearch();
         }
+    } else {
+        let index = textLower.indexOf(queryLower);
+        while (index !== -1) {
+            searchMatches.push(index);
+            index = textLower.indexOf(queryLower, index + query.length);
+        }
+    }
+
+    document.getElementById('searchStatus').innerText = searchMatches.length > 0 ? `1/${searchMatches.length}` : "0/0";
+    if (searchMatches.length > 0) { 
+        currentSearchIndex = 0; 
+        selectMatch(); 
+    }
+    renderHighlights();
+}
+
+let searchHistory = JSON.parse(localStorage.getItem('sc_searchHistory') || "[]");
+
+
 
         function setReplaceTarget() {
             const start = editorEl.selectionStart;
@@ -695,78 +767,6 @@
             showToast(`Target gesetzt: ${selectedText}`, "green");
         }
 
-        function updateSearch() {
-    const input = document.getElementById('searchInput');
-    const query = input.value.trim();
-    const text = editorEl.value;
-    searchMatches = [];
-    currentSearchIndex = -1;
-
-    // --- NEU: Historie-Logik ---
-    // Wir warten 1,5 Sekunden nach dem Tippen, bevor wir den Begriff in die Top 3 aufnehmen
-    clearTimeout(window.historyTimer);
-    if (query.length >= 2) {
-        window.historyTimer = setTimeout(() => addToHistory(query), 1500);
-    }
-    // ---------------------------
-
-    if (!query || document.getElementById('searchPanel').classList.contains('hidden')) { 
-        backdropEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
-        document.getElementById('searchStatus').innerText = "0/0"; 
-        return; 
-    }
-
-    const textLower = text.toLowerCase();
-    let queryLower = query.toLowerCase();
-
-            if (isFunctionSearch) {
-        let regex;
-        // Sicherer Regex-String (escaped Sonderzeichen)
-        const q = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
-
-        if (activeTab === 'js') {
-            // JS-Modus: function, const, let, var
-            regex = new RegExp(`(?:function\\s+|const\\s+|let\\s+|var\\s+)[a-zA-Z0-9_$]*${q}[a-zA-Z0-9_$]*`, 'gi');
-        } 
-        else if (activeTab === 'css') {
-            // CSS-Modus: Klassen . und IDs #
-            regex = new RegExp(`[.#][a-zA-Z0-9_-]*${q}[a-zA-Z0-9_-]*`, 'gi');
-        } 
-        else if (activeTab === 'html') {
-            // HTML-Modus: Findet Tags <, IDs id=" UND JS-Funktionen (wichtig vor dem Split!)
-            regex = new RegExp(`(?:<|id="|function\\s+|const\\s+|let\\s+|var\\s+)[a-zA-Z0-9_$]*${q}[a-zA-Z0-9_$]*`, 'gi');
-        }
-
-        if (regex) {
-            let match;
-            while ((match = regex.exec(text)) !== null) {
-                let fullMatch = match[0];
-                // Offset-Erkennung: Wir springen über das Keyword (z.B. "function ") direkt zum Namen
-                let keywordMatch = fullMatch.match(/^(?:function\\s+|const\\s+|let\\s+|var\\s+|<|id=")/i);
-                let offset = keywordMatch ? keywordMatch[0].length : 0;
-                
-                searchMatches.push(match.index + offset);
-            }
-        }
-    } else {
-        // Normale Suche (wenn ƒ-Button aus ist)
-        let index = textLower.indexOf(queryLower);
-        while (index !== -1) {
-            searchMatches.push(index);
-            index = textLower.indexOf(queryLower, index + query.length);
-        }
-    }
-
-
-    document.getElementById('searchStatus').innerText = searchMatches.length > 0 ? `1/${searchMatches.length}` : "0/0";
-    if (searchMatches.length > 0) { 
-        currentSearchIndex = 0; 
-        selectMatch(); 
-    }
-    renderHighlights();
-} // <-- Diese Klammer hat in deinem Post gefehlt!
-
-let searchHistory = JSON.parse(localStorage.getItem('sc_searchHistory') || "[]");
 
 function clearSearch() {
     const input = document.getElementById('searchInput');
@@ -815,6 +815,7 @@ function renderHighlights() {
     const query = document.getElementById('searchInput').value;
     const text = editorEl.value;
 
+    // Wenn keine Suche aktiv ist, Text normal anzeigen (ohne Markierung)
     if (!query || searchMatches.length === 0 || document.getElementById('searchPanel').classList.contains('hidden')) {
         backdropEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
         return;
@@ -824,9 +825,12 @@ function renderHighlights() {
     let lastIdx = 0;
 
     searchMatches.forEach((matchIdx, i) => {
+        // Text vor dem Treffer
         resultHtml += escapeHtml(text.substring(lastIdx, matchIdx));
+        
         let matchLength = query.length;
         
+        // Sonderlogik für Funktionssuche: Markiere das ganze Wort
         if (isFunctionSearch) {
             const remainingText = text.substring(matchIdx);
             const wordMatch = remainingText.match(/^[a-zA-Z0-9_$.#<>="-]*/);
@@ -838,12 +842,17 @@ function renderHighlights() {
         const matchText = text.substring(matchIdx, matchIdx + matchLength);
         const isCurrent = i === currentSearchIndex;
 
+        // Hier wird das <mark> Tag gesetzt
         resultHtml += `<mark class="search-highlight ${isCurrent ? 'search-current' : ''}">${escapeHtml(matchText)}</mark>`;
         lastIdx = matchIdx + matchLength;
     });
 
+    // Restlicher Text nach dem letzten Treffer
     resultHtml += escapeHtml(text.substring(lastIdx));
-    backdropEl.innerHTML = resultHtml.replace(/\n/g, '<br>') + '<br>'; 
+    
+    // In das Backdrop-Element schreiben und Zeilenumbrüche fixen
+    backdropEl.innerHTML = resultHtml.replace(/\n/g, '<br>') + " "; 
+console.log("Anzahl Treffer im Backdrop:", backdropEl.querySelectorAll('mark').length);
 }
 
 
@@ -884,6 +893,7 @@ function renderHighlights() {
     const content = files[activeTab] || "";
     editorEl.value = content;
     backdropEl.innerText = content; // Wichtig für das Such-Highlighting
+onEditorInput({ target: editorEl });
     
     if (!isInitial) showToast(`Tab: ${tab.toUpperCase()}`, "blue");
     
@@ -1246,10 +1256,7 @@ Rules:
             }
         });
 
-// Aktualisiert die Zahlen, wenn du Text eingibst oder löschst
-editorEl.addEventListener('input', () => {
-    updateLineNumbers();
-});
+
 
 // 1. Zentrale Scroll-Funktion
 function onEditorScroll() {
@@ -1295,40 +1302,14 @@ editorEl.addEventListener('keydown', (e) => {
 });
 
 // --- INITIALISIERUNG BEIM START ---
-// --- INITIALISIERUNG BEIM START ---
 function setupInitialState() {
-    isReadOnly = true; 
-    const btn = document.getElementById('lockBtn');
-    
-    // Editor in den Markier-Modus versetzen
+    isReadOnly = true;
+
     editorEl.setAttribute('inputmode', 'none');
     editorEl.classList.add('selection-mode');
-    
-    if (btn) {
-        btn.innerText = "⌨️"; 
-        btn.classList.remove('glow-border', 'bg-blue-600');
-        btn.classList.add('bg-gray-700', 'text-white');
-    }
 
-    // 1. Sofortiger Versuch (für die Optik)
     updateLineNumbers();
-
-    // 2. Erzwungener Versuch nach Pufferzeit
-    setTimeout(() => {
-        // FORCE: Wir stellen sicher, dass der Text wirklich im Editor geladen ist
-        if (files[activeTab]) {
-            editorEl.value = files[activeTab];
-        }
-        
-        updateLineNumbers(); // Jetzt generiert er die Zahlen basierend auf echtem Inhalt
-        
-        const lastPos = scrollPositions[activeTab] || 0;
-        editorEl.scrollTop = lastPos;
-        
-        // Synchronisiert Backdrop und Zeilennummern sofort
-        syncScroll(); 
-        console.log("System bereit: " + editorEl.value.split('\n').length + " Zeilen.");
-    }, 200); // 200ms ist sicherer, damit der DOM stabil ist
+    syncScroll();
 }
 
 // Die Listener müssen aktiv bleiben:
