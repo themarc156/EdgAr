@@ -270,12 +270,19 @@ mark.search-current {
                 <div id="lineNumbers">1</div>
                 <div id="searchBackdrop"></div>
                 <textarea id="mainEditor" spellcheck="false" inputmode="none" oninput="onEditorInput(event)" onscroll="onEditorScroll()" onclick="handleEditorClick()" placeholder="Code hier eingeben..."></textarea>
-            </div>
-        </div>
-
-        <div class="hidden md:flex w-[30%] flex-col bg-gray-900 border-l border-gray-800 shadow-2xl overflow-hidden">
+                
+                <div id="scrollMap" 
+                     onclick="handleScrollMapClick(event)"
+                     style="position: absolute; right: 0; top: 0; width: 14px; height: 100%; 
+                            background: rgba(255,255,255,0.03); cursor: pointer; z-index: 20; 
+                            border-left: 1px solid rgba(255,255,255,0.05); pointer-events: auto;">
+                </div>
+            </div> </div> <div class="hidden md:flex w-[30%] flex-col bg-gray-900 border-l border-gray-800 shadow-2xl overflow-hidden">
             <div class="h-12 bg-gray-850 border-b border-gray-800 flex justify-between items-center px-3 shrink-0">
-                <h2 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">KI-Input</h2>
+                <div class="flex flex-col">
+                    <h2 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">KI-Input</h2>
+                    <span id="sidebarStatusTab" class="text-[9px] text-blue-400 font-mono">index.html</span>
+                </div>
                 <div class="flex items-center space-x-2">
                     <button onclick="clearAiInput()" class="text-[10px] text-red-400 font-bold uppercase hover:text-red-300 transition">Clear</button>
                     <select id="aiMode" class="bg-gray-800 text-white text-[10px] rounded px-1 border border-gray-700 outline-none">
@@ -307,7 +314,7 @@ mark.search-current {
                     spellcheck="false"></textarea>
             </div>
         </div>
-    </div>
+    </div> ```
 </body>
 
     <script>
@@ -316,6 +323,7 @@ mark.search-current {
         let isFunctionSearch = false; 
         let isSmartSelectActive = false;
         let promptQueue = [];
+let snapshotTimer; // Hält die Referenz für die Verzögerung
 
         let files = {
             html: `<!DOCTYPE html>\n<html>\n<head>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <h1 style="color: #333; margin-top: 20px;">Projekt bereit</h1>\n  <button id="btn" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer;">Klick mich</button>\n  <script src="script.js"><\/script>\n</body>\n</html>`,
@@ -327,6 +335,14 @@ mark.search-current {
         let undoStacks = { html: [], css: [], js: [] };
         let redoStacks = { html: [], css: [], js: [] };
         const MAX_HISTORY = 50; 
+
+// Speichert die letzten "Snapshots" der relevanten Blöcke
+let codeSnapshots = {
+    html: "",
+    css: "",
+    js: "",
+    lastUpdate: 0
+};
 
         let searchMatches = [];
         let currentSearchIndex = -1;
@@ -568,6 +584,39 @@ lineNumbersEl.textContent = nums.join('\n');
             typingTimer = setTimeout(() => { saveToUndoStack(editorEl.value); }, 500);
         }
 
+function updateScrollMap() {
+    const map = document.getElementById('scrollMap');
+    if (!map) return;
+    map.innerHTML = ''; 
+
+    const text = editorEl.value;
+    const totalChars = text.length;
+    if (totalChars === 0 || searchMatches.length === 0) return;
+
+    const editorHeight = editorEl.clientHeight;
+
+    searchMatches.forEach((matchIdx, i) => {
+        // Wir berechnen die Position basierend auf dem Zeichen-Index im Gesamttext
+        const relativePos = matchIdx / totalChars;
+        const topPx = relativePos * editorHeight;
+
+        const marker = document.createElement('div');
+        marker.className = "scroll-marker"; // Falls du CSS-Klassen nutzen willst
+        marker.style.cssText = `
+            position: absolute;
+            top: ${topPx}px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: ${i === currentSearchIndex ? '#fbbf24' : '#3b82f6'};
+            opacity: 0.8;
+            box-shadow: 0 0 2px rgba(0,0,0,0.8);
+        `;
+        
+        map.appendChild(marker);
+    });
+}
+
         function handleAutoClose(char) {
             const pairs = { '{': '}', '(': ')', '[': ']' };
             if (pairs[char]) {
@@ -579,6 +628,29 @@ lineNumbersEl.textContent = nums.join('\n');
                 backdropEl.innerText = editorEl.value;
             }
         }
+
+function handleScrollMapClick(e) {
+    // Verhindere, dass der Klick andere Elemente darunter stört
+    e.stopPropagation();
+
+    const map = document.getElementById('scrollMap');
+    const rect = map.getBoundingClientRect();
+    
+    // Wo wurde geklickt? (0 bis 1, wobei 0 ganz oben und 1 ganz unten ist)
+    const clickY = e.clientY - rect.top;
+    const percentage = clickY / rect.height;
+
+    // Ziel-Scroll-Position berechnen
+    // Wir nehmen die gesamte scrollbare Höhe des Editors
+    const scrollTarget = percentage * editorEl.scrollHeight;
+
+    // Editor dorthin bewegen
+    // Wir ziehen ein Drittel der Editorhöhe ab, damit die Stelle eher mittig erscheint
+    editorEl.scrollTop = scrollTarget - (editorEl.clientHeight / 3);
+    
+    // Alles synchronisieren (Backdrop, Zeilennummern etc.)
+    syncScroll();
+}
 
         function saveToUndoStack(code) {
             const stack = undoStacks[activeTab];
@@ -750,6 +822,7 @@ function updateSearch() {
         selectMatch(); 
     }
     renderHighlights();
+updateScrollMap();
 }
 
 let searchHistory = JSON.parse(localStorage.getItem('sc_searchHistory') || "[]");
@@ -871,6 +944,7 @@ console.log("Anzahl Treffer im Backdrop:", backdropEl.querySelectorAll('mark').l
                 backdropEl.scrollTop = targetScroll;
                 syncScroll();
             }
+updateScrollMap();
         }
 
         function findNext() { if (searchMatches.length === 0) return; currentSearchIndex = (currentSearchIndex + 1) % searchMatches.length; selectMatch(); }
@@ -904,6 +978,7 @@ onEditorInput({ target: editorEl });
     // 3. WICHTIG: Erst Nummern generieren, dann Scrollen
     updateSearch();
     updateLineNumbers(); 
+updateScrollMap();
     
     if (undoStacks[activeTab].length === 0) { 
         undoStacks[activeTab].push(content); 
@@ -1117,8 +1192,10 @@ function handleKey(e) {
 }
 
 async function sendAI() {
+// WICHTIG: Speichert den aktuellen Editor-Inhalt in das 'files' Objekt
+    updateCurrentFile();
+    // 1. Prompt-Check
     if (promptQueue.length === 0) {
-        // Falls die Warteschlange leer ist, nehmen wir einfach den Text, der JETZT im Feld steht
         const currentInput = document.getElementById("aiInput").value.trim();
         if (currentInput) {
             promptQueue.push(currentInput);
@@ -1129,33 +1206,47 @@ async function sendAI() {
     }
 
     const mode = document.getElementById("aiMode").value;
-    const code = editorEl.value;
+    
+    // 2. SNAPSHOT-LOGIK: Wir holen den aktuellen Stand ALLER Dateien
+    // 'files' ist dein globales Objekt, das html, css und js speichert
+    const contextHtml = files.html || "";
+    const contextCss = files.css || "";
+    const contextJs = files.js || "";
 
-    showToast("KI denkt...", "blue");
+    showToast("KI analysiert Projekt...", "blue");
 
+    // 3. PROMPT-AUFBAU: Die KI erhält nun das komplette Bild
     const fullPrompt = `
-You are an expert web developer.
+You are an expert web developer. Below is the current state of the project.
 
-Project code:
-${code}
+### PROJECT CONTEXT ###
+[FILE: index.html]
+${contextHtml}
+
+[FILE: style.css]
+${contextCss}
+
+[FILE: script.js]
+${contextJs}
+#######################
 
 Tasks:
 ${promptQueue.map((p, i) => `${i + 1}. ${p}`).join("\n")}
 
 Rules:
-- Return ONLY code
-- Improve structure
+- Return ONLY the code for the changes.
+- If the task spans multiple files, provide the code blocks clearly labeled.
+- Improve structure and maintain consistency with the existing context.
 `;
 
-    console.log("Sending:", fullPrompt);
+    console.log("Sending Snapshot-Request:", fullPrompt);
 
-        try {
-        // Hier setzen wir die ABSOLUTE Vercel-URL ein!
+    try {
         const res = await fetch("https://edgaride.vercel.app/api/ai", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Accept": "application/json" // <-- Diese Zeile hier einfügen!
+                "Accept": "application/json"
             },
             body: JSON.stringify({
                 prompt: fullPrompt,
@@ -1165,21 +1256,21 @@ Rules:
 
         const data = await res.json();
 
-
         if (!res.ok) {
-            // Zeigt uns im Toast den echten Fehler an, falls Groq meckert!
             showToast(`Fehler: ${data.error || "Server-Fehler"}`, "red");
             return;
         }
 
         const aiCode = data.choices[0].message.content;
 
+        // Antwort ins Feld eintragen
         document.getElementById('aiInput').value = aiCode;
         
-        // Die Warteschlange erst leeren, wenn die Anfrage erfolgreich war!
-        promptQueue = [];
+        // UI Resize falls nötig
+        autoResizeAiInput(document.getElementById('aiInput'));
 
-        showToast("Fertig 🚀", "green");
+        promptQueue = [];
+        showToast("Antwort mit Kontext erhalten 🚀", "green");
 
     } catch (err) {
         console.error(err);
