@@ -233,43 +233,76 @@ mark.search-current {
     <div class="flex-1 flex overflow-hidden">
         
         <div class="w-full md:w-[70%] flex flex-col border-r border-gray-800 bg-[#0d1117]">
-            <header class="h-12 px-3 bg-gray-800 border-b border-gray-700 flex justify-between items-center shrink-0 z-20">
-                <div class="flex items-center space-x-3">
-                    <button onclick="toggleSidebar()" class="text-white text-xl">☰</button>
-                    <h1 class="text-sm font-bold text-blue-400">Edg<span class="text-white">Ar</span></h1>
-                </div>
-                <div class="flex items-center space-x-1 h-8">
-                    <button onclick="toggleSearch()" class="bg-gray-700 hover:bg-gray-600 w-8 h-full rounded text-sm transition">🔍</button>
-                    <button onclick="formatCurrentCode()" class="bg-gray-700 hover:bg-gray-600 w-8 h-full rounded text-sm transition">🪄</button>
-                    <button id="lockBtn" onclick="toggleEditMode()" class="bg-gray-700 hover:bg-gray-600 w-8 h-full rounded text-base">⌨️</button>
-                    <button onclick="runProject()" class="bg-green-600 hover:bg-green-500 px-3 h-full rounded text-[10px] font-bold uppercase ml-1">Run</button>
-                </div>
-            </header>
+            <header class="h-12 px-3 bg-gray-800 border-b border-gray-700 flex items-center justify-between shrink-0 z-20">
+    <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-2 shrink-0">
+            <button onclick="toggleSidebar()" class="text-white text-xl">☰</button>
+            <h1 class="text-sm font-bold text-blue-400">Edg<span class="text-white">Ar</span></h1>
+        </div>
 
-            <div class="bg-gray-800 flex text-[10px] font-mono border-b border-gray-700 overflow-x-auto shrink-0 z-20">
-                <button onclick="switchTab('html')" id="tab-html" class="px-4 py-2 border-r border-gray-700 hover:bg-gray-700 transition tab-active">index.html</button>
-                <button onclick="switchTab('css')" id="tab-css" class="px-4 py-2 border-r border-gray-700 hover:bg-gray-700 transition">style.css</button>
-                <button onclick="switchTab('js')" id="tab-js" class="px-4 py-2 border-r border-gray-700 hover:bg-gray-700 transition">script.js</button>
-            </div>
+        <div class="flex bg-gray-900 rounded-md p-1 text-[10px] font-mono border border-gray-700 shrink-0">
+            <button onclick="switchTab('html')" id="tab-html" class="px-3 py-1 rounded-sm hover:bg-gray-700 transition tab-active">index.html</button>
+            <button onclick="switchTab('css')" id="tab-css" class="px-3 py-1 rounded-sm hover:bg-gray-700 transition">style.css</button>
+            <button onclick="switchTab('js')" id="tab-js" class="px-3 py-1 rounded-sm hover:bg-gray-700 transition">script.js</button>
+        </div>
+    </div>
+    
+    <div class="flex items-center space-x-1 h-8">
+        <button onclick="formatCurrentCode()" class="bg-gray-700 hover:bg-gray-600 w-8 h-full rounded text-sm transition">🪄</button>
+        <button onclick="runProject()" class="bg-green-600 hover:bg-green-500 px-3 h-full rounded text-[10px] font-bold uppercase transition">Run</button>
+    </div>
+</header>
 
-            <div id="searchPanel" class="hidden bg-gray-850 p-2 border-b border-gray-800 flex flex-col space-y-2 z-30 shrink-0 shadow-xl">
-                <div class="flex items-center space-x-2">
-                    <div class="relative flex-1">
-                        <input id="searchInput" type="text" placeholder="Suchen..." class="w-full bg-gray-950 border border-gray-700 rounded px-2 py-1 pr-6 text-xs text-white outline-none focus:border-blue-500" oninput="updateSearch()" onkeydown="if(event.key==='Enter') findNext()">
-                        <button onclick="clearSearch()" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white text-xs">✕</button>
+<div id="permanentToolBar" class="bg-gray-850 p-2 border-b border-gray-800 flex flex-col space-y-2 z-30 shrink-0 shadow-md pl-24">
+    
+    <div class="flex items-center w-full">
+        
+        <div class="flex items-center space-x-2">
+            <button id="smartSelectBtnHeader" onclick="toggleSmartSelect()" class="bg-gray-800 hover:bg-gray-700 w-8 h-7 rounded flex items-center justify-center transition border border-gray-700">
+                <span id="smartSelectIconHeader" class="text-xs grayscale">🎯</span>
+            </button>
+            <button id="searchFuncBtn" onclick="toggleFunctionSearch()" class="bg-gray-800 hover:bg-gray-700 text-gray-400 font-bold w-8 h-7 flex items-center justify-center rounded text-xs border border-gray-700">ƒ</button>
+            
+            <div class="relative flex items-center bg-gray-950 border border-gray-700 rounded w-[320px] overflow-hidden focus-within:border-blue-500 transition-colors">
+                <input id="searchInput" type="text" placeholder="Suchen..." 
+                       class="flex-1 bg-transparent px-2 py-1 text-xs text-white outline-none focus:bg-gray-900 transition" 
+                       oninput="updateSearch()" onkeydown="if(event.key==='Enter') findNext()">
+                
+                <div class="flex items-center bg-gray-900 border-l border-gray-800 divide-x divide-gray-800">
+                    <span id="searchStatus" class="text-[9px] text-gray-500 font-mono px-2">0/0</span>
+                    <div class="flex">
+                        <button onclick="findPrev()" class="px-2 py-1 hover:text-white text-gray-400 transition text-[10px]">▲</button>
+                        <button onclick="findNext()" class="px-2 py-1 hover:text-white text-gray-400 transition text-[10px]">▼</button>
                     </div>
-                    <button id="searchFuncBtn" onclick="toggleFunctionSearch()" class="bg-gray-800 hover:bg-gray-700 text-gray-400 font-bold w-8 h-7 flex items-center justify-center rounded text-xs">ƒ</button>
-                    <span id="searchStatus" class="text-[10px] text-gray-500 min-w-[30px]">0/0</span>
-                    <button onclick="findPrev()" class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs">◀</button>
-                    <button onclick="findNext()" class="bg-gray-800 hover:bg-gray-700 px-3 py-1 rounded text-xs">▶</button>
+                    <button onclick="clearSearch()" class="px-2 py-1 text-gray-500 hover:text-red-400 text-[10px]">✕</button>
                 </div>
-                <div id="searchHistory" class="flex space-x-2 overflow-x-auto pb-1"></div>
             </div>
+        </div>
+
+        <div class="flex-1"></div>
+
+        <div class="flex items-center space-x-1 shrink-0 pr-1">
+            <div class="flex items-center bg-gray-950 border border-gray-700 rounded overflow-hidden w-[75px]">
+                <span class="pl-2 text-gray-600 text-[10px] font-bold">#</span>
+                <input id="lineInput" type="number" placeholder="Zeile" 
+                       class="w-full bg-transparent px-1 py-1 text-xs text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                       onkeydown="if(event.key==='Enter') goToLine()">
+            </div>
+            <button onclick="goToLine()" class="bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded border border-gray-700 text-[10px] text-gray-400">Go</button>
+        </div>
+    </div>
+
+    <div class="flex items-center mt-1">
+        <div class="w-[80px] shrink-0"></div> 
+        <div id="searchHistory" class="flex-1 flex items-center space-x-2 overflow-x-auto min-h-[22px] no-scrollbar">
+            </div>
+    </div>
+</div>
 
             <div id="editorContainer" class="flex-1 relative overflow-hidden bg-[#0d1117]">
                 <div id="lineNumbers">1</div>
                 <div id="searchBackdrop"></div>
-                <textarea id="mainEditor" spellcheck="false" inputmode="none" oninput="onEditorInput(event)" onscroll="onEditorScroll()" onclick="handleEditorClick()" placeholder="Code hier eingeben..."></textarea>
+                <textarea id="mainEditor" spellcheck="false" oninput="onEditorInput(event)" onscroll="onEditorScroll()" onclick="handleEditorClick()" placeholder="Code hier eingeben..."></textarea>
                 
                 <div id="scrollMap" 
                      onclick="handleScrollMapClick(event)"
@@ -392,23 +425,22 @@ updateLineNumbers(); // ← DAS FEHLT
         }
 
         function toggleSmartSelect() {
-            isSmartSelectActive = !isSmartSelectActive;
-            const btn = document.getElementById('smartSelectBtn');
-            const status = document.getElementById('smartStatus');
-            const icon = document.getElementById('smartSelectIcon');
+    isSmartSelectActive = !isSmartSelectActive;
+    const btn = document.getElementById('smartSelectBtnHeader'); // Neue ID
+    const icon = document.getElementById('smartSelectIconHeader'); // Neue ID
 
-            if (isSmartSelectActive) {
-                status.innerText = "ON";
-                status.classList.replace('bg-gray-700', 'bg-blue-600');
-                icon.classList.replace('text-gray-500', 'text-blue-400');
-                showToast("Bereich-Auswahl aktiviert", "blue");
-            } else {
-                status.innerText = "OFF";
-                status.classList.replace('bg-blue-600', 'bg-gray-700');
-                icon.classList.replace('text-blue-400', 'text-gray-500');
-                showToast("Bereich-Auswahl deaktiviert", "blue");
-            }
-        }
+    if (isSmartSelectActive) {
+        btn.classList.add('border-blue-500', 'bg-blue-900/30');
+        icon.classList.remove('grayscale');
+        icon.classList.add('text-blue-400');
+        showToast("Bereich-Auswahl aktiviert", "blue");
+    } else {
+        btn.classList.remove('border-blue-500', 'bg-blue-900/30');
+        icon.classList.add('grayscale');
+        icon.classList.remove('text-blue-400');
+        showToast("Bereich-Auswahl deaktiviert", "blue");
+    }
+}
 
         function handleEditorClick() {
     if (!isSmartSelectActive) return;
@@ -456,7 +488,30 @@ updateLineNumbers(); // ← DAS FEHLT
     }
 }
 
+function goToLine() {
+    const lineInput = document.getElementById('lineInput');
+    const lineNumber = parseInt(lineInput.value);
+    if (!lineNumber) return;
 
+    const lines = editorEl.value.split('\n');
+    if (lineNumber > 0 && lineNumber <= lines.length) {
+        let charIndex = 0;
+        for (let i = 0; i < lineNumber - 1; i++) {
+            charIndex += lines[i].length + 1;
+        }
+        editorEl.focus();
+        editorEl.setSelectionRange(charIndex, charIndex);
+        
+        // Scroll-Berechnung
+        const lineHeight = 18; // Deine geschätzte Line-Height in px
+        editorEl.scrollTop = (lineNumber - 5) * lineHeight; // -5 damit die Zeile nicht ganz oben klebt
+        
+        showToast(`Zeile ${lineNumber}`, "blue");
+        lineInput.value = "";
+    } else {
+        showToast("Existiert nicht", "red");
+    }
+}
 
 
         function autoResizeAiInput(el) {
@@ -747,33 +802,32 @@ function formatCurrentCode() {
 function toggleSymbols() { document.getElementById('symbolsPanel').classList.toggle('hidden'); }
 
 function toggleSearch() {
-    const panel = document.getElementById('searchPanel');
     const input = document.getElementById('searchInput');
-    panel.classList.toggle('hidden');
-    if(!panel.classList.contains('hidden')) { 
-        input.focus(); 
-        updateSearch(); 
-    } else { 
-        renderHighlights(); 
+    if (input) {
+        input.focus();
+        input.select(); // Markiert den Text, damit du sofort losschreiben kannst
+        updateSearch();
     }
 }
 
 function toggleFunctionSearch() {
     const btn = document.getElementById('searchFuncBtn');
     isFunctionSearch = !isFunctionSearch;
+    
     if(isFunctionSearch) {
-        btn.classList.remove('bg-gray-800', 'text-gray-400');
-        btn.classList.add('bg-blue-600', 'text-white');
+        // Blaues Leuchten statt massiv blauem Block
+        btn.classList.add('text-blue-400', 'border-blue-500', 'bg-blue-900/30');
         showToast("Funktions-Filter aktiv", "blue");
     } else {
-        btn.classList.remove('bg-blue-600', 'text-white');
-        btn.classList.add('bg-gray-800', 'text-gray-400');
+        btn.classList.remove('text-blue-400', 'border-blue-500', 'bg-blue-900/30');
     }
     updateSearch();
 }
 
 function updateSearch() {
     const input = document.getElementById('searchInput');
+    if (!input) return; // Sicherheits-Check
+
     const query = input.value.trim();
     const text = editorEl.value;
     searchMatches = [];
@@ -784,9 +838,14 @@ function updateSearch() {
         window.historyTimer = setTimeout(() => addToHistory(query), 1500);
     }
 
-    if (!query || document.getElementById('searchPanel').classList.contains('hidden')) { 
+    // WICHTIG: Hier war der Fehler! 
+    // Wir prüfen NUR noch, ob die Query leer ist. 
+    // Die Prüfung auf 'searchPanel' (das es nicht mehr gibt) ist weg.
+    if (!query) { 
         backdropEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
         document.getElementById('searchStatus').innerText = "0/0"; 
+        renderHighlights(); 
+        updateScrollMap();
         return; 
     }
 
@@ -816,13 +875,18 @@ function updateSearch() {
         }
     }
 
-    document.getElementById('searchStatus').innerText = searchMatches.length > 0 ? `1/${searchMatches.length}` : "0/0";
+    // Status Anzeige aktualisieren
+    const statusEl = document.getElementById('searchStatus');
+    if (statusEl) {
+        statusEl.innerText = searchMatches.length > 0 ? `1/${searchMatches.length}` : "0/0";
+    }
+
     if (searchMatches.length > 0) { 
         currentSearchIndex = 0; 
         selectMatch(); 
     }
     renderHighlights();
-updateScrollMap();
+    updateScrollMap();
 }
 
 let searchHistory = JSON.parse(localStorage.getItem('sc_searchHistory') || "[]");
@@ -888,8 +952,9 @@ function renderHighlights() {
     const query = document.getElementById('searchInput').value;
     const text = editorEl.value;
 
-    // Wenn keine Suche aktiv ist, Text normal anzeigen (ohne Markierung)
-    if (!query || searchMatches.length === 0 || document.getElementById('searchPanel').classList.contains('hidden')) {
+    // GEÄNDERT: Die Prüfung auf 'searchPanel' wurde entfernt.
+    // Wir prüfen nur noch, ob eine Query existiert und ob Treffer da sind.
+    if (!query || searchMatches.length === 0) {
         backdropEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
         return;
     }
@@ -924,8 +989,10 @@ function renderHighlights() {
     resultHtml += escapeHtml(text.substring(lastIdx));
     
     // In das Backdrop-Element schreiben und Zeilenumbrüche fixen
+    // Das zusätzliche Leerzeichen am Ende verhindert Scroll-Glitch bei manchen Browsern
     backdropEl.innerHTML = resultHtml.replace(/\n/g, '<br>') + " "; 
-console.log("Anzahl Treffer im Backdrop:", backdropEl.querySelectorAll('mark').length);
+    
+    console.log("Anzahl Treffer im Backdrop:", backdropEl.querySelectorAll('mark').length);
 }
 
 
