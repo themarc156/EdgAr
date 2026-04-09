@@ -66,7 +66,10 @@
 }
 
 #mainEditor {
-    z-index: 2;
+    z-index: 10 !important;
+    position: relative;
+    display: block !important;
+    pointer-events: auto !important;
     background: transparent !important; /* Muss durchsichtig sein */
     color: white;
     caret-color: #3b82f6;
@@ -81,7 +84,9 @@
     background: #0d1117; /* Dein Hintergrund */
     color: transparent !important;
     pointer-events: none !important;
-    user-select: none;
+-webkit-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
     overflow: hidden;
     /* FIX: Wir entfernen den Rahmen hier, da er das Backdrop um 2px verschiebt! */
     border: none; 
@@ -302,7 +307,7 @@ mark.search-current {
             <div id="editorContainer" class="flex-1 relative overflow-hidden bg-[#0d1117]">
                 <div id="lineNumbers">1</div>
                 <div id="searchBackdrop"></div>
-                <textarea id="mainEditor" spellcheck="false" oninput="onEditorInput(event)" onscroll="onEditorScroll()" onclick="handleEditorClick()" placeholder="Code hier eingeben..."></textarea>
+                <textarea id="mainEditor" autofocus spellcheck="false" oninput="onEditorInput(event)" onscroll="onEditorScroll()" onclick="handleEditorClick()" placeholder="Code hier eingeben..."></textarea>
                 
                 <div id="scrollMap" 
                      onclick="handleScrollMapClick(event)"
@@ -426,19 +431,36 @@ updateLineNumbers(); // ← DAS FEHLT
 
         function toggleSmartSelect() {
     isSmartSelectActive = !isSmartSelectActive;
-    const btn = document.getElementById('smartSelectBtnHeader'); // Neue ID
-    const icon = document.getElementById('smartSelectIconHeader'); // Neue ID
+isReadOnly = isSmartSelectActive; // <--- DIESE ZEILE MUSS REIN!
+
+    const btn = document.getElementById('smartSelectBtnHeader');
+    const icon = document.getElementById('smartSelectIconHeader');
+    const editor = document.getElementById('mainEditor'); // Wir brauchen Zugriff auf den Editor
 
     if (isSmartSelectActive) {
+        // AKTIVIEREN
         btn.classList.add('border-blue-500', 'bg-blue-900/30');
         icon.classList.remove('grayscale');
         icon.classList.add('text-blue-400');
+        
+        // Sperrt die Tastatur, damit beim Klicken zur Auswahl nicht die Tastatur aufpoppt (Mobil) 
+        // oder Eingaben den Markierungsprozess stören.
+        editor.setAttribute('inputmode', 'none'); 
+        editor.classList.add('selection-mode');
+        
         showToast("Bereich-Auswahl aktiviert", "blue");
     } else {
+        // DEAKTIVIEREN
         btn.classList.remove('border-blue-500', 'bg-blue-900/30');
         icon.classList.add('grayscale');
         icon.classList.remove('text-blue-400');
+        
+        // GIBT DIE TASTATUR WIEDER FREI
+        editor.removeAttribute('inputmode'); 
+        editor.classList.remove('selection-mode');
+        
         showToast("Bereich-Auswahl deaktiviert", "blue");
+        editor.focus(); // Fokus direkt zurück, damit man weitertippen kann
     }
 }
 
@@ -629,15 +651,24 @@ lineNumbersEl.textContent = nums.join('\n');
         let typingTimer;
 
         function onEditorInput(e) {
-            if (!isReadOnly && e.inputType === 'insertText' && e.data) {
-                handleAutoClose(e.data);
-            }
-            updateCurrentFile();
-            updateLineNumbers();
-            updateSearch();
-            clearTimeout(typingTimer);
-            typingTimer = setTimeout(() => { saveToUndoStack(editorEl.value); }, 500);
-        }
+    if (!isReadOnly && e.inputType === 'insertText' && e.data) {
+        handleAutoClose(e.data);
+    }
+    
+    updateCurrentFile();
+    updateLineNumbers();
+
+    // WICHTIG: Suche verzögern (Debounce), damit Tippen flüssig bleibt
+    clearTimeout(window.searchTimer);
+    window.searchTimer = setTimeout(() => {
+        updateSearch();
+    }, 50); // 50ms Verzögerung reicht oft schon wunderbar aus
+
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => { 
+        saveToUndoStack(editorEl.value); 
+    }, 500);
+}
 
 function updateScrollMap() {
     const map = document.getElementById('scrollMap');
@@ -1461,23 +1492,30 @@ editorEl.addEventListener('keydown', (e) => {
 
 // --- INITIALISIERUNG BEIM START ---
 function setupInitialState() {
-    isReadOnly = true;
+    // 1. Schreibmodus aktivieren
+    isReadOnly = false;
 
-    editorEl.setAttribute('inputmode', 'none');
-    editorEl.classList.add('selection-mode');
+    // 2. Sicherstellen, dass KEINE Sperr-Attribute gesetzt sind
+    editorEl.removeAttribute('inputmode');
+    editorEl.classList.remove('selection-mode');
 
+    // 3. UI Komponenten aktualisieren
     updateLineNumbers();
     syncScroll();
 }
 
-// Die Listener müssen aktiv bleiben:
+// Event Listener (Sollten vor der Initialisierung oder direkt danach stehen)
 editorEl.addEventListener('scroll', onEditorScroll);
 editorEl.addEventListener('input', onEditorInput);
 
-// Initialisierung starten
+// Initialisierung jetzt ausführen
 setupInitialState();
 
-
+// Fokus setzen, sobald das Fenster komplett geladen ist
+window.onload = () => {
+    editorEl.focus();
+    console.log("EdgAr bereit: Schreibmodus aktiv.");
+};
 
     </script>
 </body>
