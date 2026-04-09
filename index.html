@@ -250,7 +250,13 @@ mark.search-current {
             
             <nav class="flex-1 p-2 space-y-1 overflow-y-auto bg-gray-900">
                 <div class="px-4 py-2 text-[10px] text-gray-500 uppercase font-bold tracking-widest">Datei</div>
-                <label class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md cursor-pointer transition">
+ 
+<button onclick="createNewProject(); toggleSidebar();" class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md transition text-left">
+        <span class="text-blue-500 text-lg">📄</span>
+        <span class="font-semibold ml-3">Neu</span>
+    </button>
+
+               <label class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md cursor-pointer transition">
                     <span class="text-yellow-500 text-lg">📁</span>
                     <span class="font-semibold">Datei öffnen</span>
                     <input type="file" id="fileInput" onchange="importFile(event)" multiple>
@@ -572,6 +578,35 @@ async function saveProjectDirectly() {
             showToast("Speichern fehlgeschlagen", "red");
         }
     }
+}
+
+function createNewProject() {
+    // Sicherheitsabfrage, damit nichts versehentlich gelöscht wird
+    if (!confirm("Neues Projekt erstellen? Ungespeicherte Änderungen gehen verloren.")) return;
+
+    // 1. Dateien auf Standardwerte zurücksetzen
+    files = {
+        html: `<!DOCTYPE html>\n<html>\n<head>\n <link rel="stylesheet" href="style.css">\n</head>\n<body>\n <h1>Neues Projekt</h1>\n <script src="script.js"></\script>\n</body>\n</html>`,
+        css: `/* Deine Styles */\nbody {\n background: #f0f0f0;\n font-family: sans-serif;\n}`,
+        js: `// Dein Code\nconsole.log("EdgAr Projekt gestartet!");`
+    };
+
+    // 2. File-System Verknüpfungen lösen
+    fileHandles = {
+        html: null,
+        css: null,
+        js: null
+    };
+
+    // 3. Undo-Stacks leeren
+    undoStacks = { html: [files.html], css: [files.css], js: [files.js] };
+    redoStacks = { html: [], css: [], js: [] };
+
+    // 4. UI aktualisieren
+    localStorage.setItem('sc_loadedFileName', 'index');
+    switchTab(activeTab, true);
+    
+    showToast("Neues Projekt erstellt ✨", "blue");
 }
 
 async function openFileWithAPI() {
@@ -1684,32 +1719,50 @@ editorEl.addEventListener('keydown', (e) => {
 });
 
 // --- INITIALISIERUNG BEIM START ---
+// --- Event Listener Registrierung ---
+
+// Scroll- und Input-Events für den Editor
+editorEl.addEventListener('scroll', onEditorScroll);
+editorEl.addEventListener('input', onEditorInput);
+
+// Klick-Event für Smart-Select & Strg+Klick Logik
+editorEl.addEventListener('click', handleEditorClick);
+
+// Globaler Shortcut-Listener (Strg+S zum Speichern)
+window.addEventListener('keydown', (e) => {
+    // Prüft auf Strg+S oder Cmd+S (Mac)
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault(); // Verhindert den Browser-Speicherdialog
+        saveProjectDirectly();
+    }
+});
+
+/**
+ * Initialisiert den Editor-Zustand beim Laden oder Tab-Wechsel
+ */
 function setupInitialState() {
-    // 1. Schreibmodus aktivieren
+    // 1. Schreibmodus standardmäßig aktivieren
     isReadOnly = false;
 
-    // 2. Sicherstellen, dass KEINE Sperr-Attribute gesetzt sind
+    // 2. Sicherstellen, dass keine UI-Sperren vom Smart-Select aktiv sind
     editorEl.removeAttribute('inputmode');
     editorEl.classList.remove('selection-mode');
 
-    // 3. UI Komponenten aktualisieren
+    // 3. UI-Komponenten (Zeilennummern & Scroll-Position) synchronisieren
     updateLineNumbers();
     syncScroll();
 }
 
-// Event Listener (Sollten vor der Initialisierung oder direkt danach stehen)
-editorEl.addEventListener('scroll', onEditorScroll);
-editorEl.addEventListener('input', onEditorInput);
-
-// Initialisierung jetzt ausführen
+// Die Initialisierung sofort beim Laden des Skripts ausführen
 setupInitialState();
 
-// Fokus setzen, sobald das Fenster komplett geladen ist
+// Fokus und Abschlussmeldung, wenn die Seite komplett bereit ist
 window.onload = () => {
     editorEl.focus();
-    console.log("EdgAr bereit: Schreibmodus aktiv.");
+    console.log("EdgAr IDE: System bereit. Viel Erfolg beim Coden!");
 };
 
-    </script>
+// Ende des Skripts
+</script>
 </body>
 </html>
