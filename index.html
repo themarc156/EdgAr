@@ -448,6 +448,13 @@ let fileHandles = {
     js: null
 };
 
+// Speichert die echten Dateinamen (standardmäßig Initialwerte)
+let fileNames = {
+    html: 'index.html',
+    css: 'style.css',
+    js: 'script.js'
+};
+
         let files = {
             html: `<!DOCTYPE html>\n<html>\n<head>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <h1 style="color: #333; margin-top: 20px;">Projekt bereit</h1>\n  <button id="btn" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer;">Klick mich</button>\n  <script src="script.js"><\/script>\n</body>\n</html>`,
             css: `body { background: #f4f4f4; color: #333; text-align: center; font-family: sans-serif; }\n.openlibrary { border: 1px solid blue; }`,
@@ -549,29 +556,45 @@ isReadOnly = isSmartSelectActive;
     }
 }
 
+function updateFileNameUI() {
+    // 1. Den passenden Tab-Button finden (tab-html, tab-css oder tab-js)
+    const currentTabBtn = document.getElementById(`tab-${activeTab}`);
+    if (currentTabBtn) {
+        currentTabBtn.innerText = fileNames[activeTab];
+    }
+
+    // 2. Optional: Auch die Anzeige über dem KI-Input rechts aktualisieren
+    const sidebarStatus = document.getElementById('sidebarStatusTab');
+    if (sidebarStatus) {
+        sidebarStatus.innerText = fileNames[activeTab];
+    }
+}
+
 async function saveProjectDirectly() {
-    updateCurrentFile(); // Aktuellen Editor-Stand in 'files' Objekt sichern
+    updateCurrentFile();
     const content = files[activeTab];
     
     try {
-        // Falls wir für diesen Tab noch keine Datei verknüpft haben, fragen wir nach
-        if (!fileHandles[activeTab]) {
-            const options = {
-                suggestedName: activeTab === 'html' ? 'index.html' : (activeTab === 'css' ? 'style.css' : 'script.js'),
-                types: [{
-                    description: 'Web Datei',
-                    accept: { 'text/plain': [`.${activeTab}`] },
-                }],
-            };
-            fileHandles[activeTab] = await window.showSaveFilePicker(options);
-        }
+        const options = {
+            suggestedName: fileNames[activeTab], // Nutzt jetzt den aktuellen Namen als Vorschlag
+            types: [{
+                description: 'Web Datei',
+                accept: { 'text/plain': [`.${activeTab === 'js' ? 'js' : activeTab}`] },
+            }],
+        };
 
-        // Schreibzugriff vorbereiten
-        const writable = await fileHandles[activeTab].createWritable();
+        const tempHandle = await window.showSaveFilePicker(options);
+        
+        // --- NEU: Dateinamen aktualisieren ---
+        fileNames[activeTab] = tempHandle.name; 
+        updateFileNameUI();
+        // -------------------------------------
+
+        const writable = await tempHandle.createWritable();
         await writable.write(content);
         await writable.close();
 
-        showToast(`${activeTab.toUpperCase()} direkt gespeichert! 💾`, "green");
+        showToast(`${tempHandle.name} gespeichert! 💾`, "green");
     } catch (err) {
         if (err.name !== 'AbortError') {
             console.error(err);
@@ -1057,19 +1080,21 @@ function toggleSearch() {
 
 function toggleFunctionSearch() {
     const btn = document.getElementById('searchFuncBtn');
+    const input = document.getElementById('searchInput');
     isFunctionSearch = !isFunctionSearch;
     
     if(isFunctionSearch) {
-        // Blaues Leuchten statt massiv blauem Block
         btn.classList.add('text-blue-400', 'border-blue-500', 'bg-blue-900/30');
         showToast("Funktions-Filter aktiv", "blue");
+        if (input) input.focus(); // Fokus ins Suchfeld
     } else {
         btn.classList.remove('text-blue-400', 'border-blue-500', 'bg-blue-900/30');
     }
-    updateSearch();
+    
+    // WICHTIG: Hier 'true' mitgeben, damit der Editor sofort zum ersten Treffer springt!
+    updateSearch(true);
 }
 
-// Wir fügen forceScroll hinzu (Standard ist false)
 function updateSearch(forceScroll = false) {
     const input = document.getElementById('searchInput');
     if (!input) return;
@@ -1094,30 +1119,41 @@ function updateSearch(forceScroll = false) {
     }
 
     const textLower = text.toLowerCase();
-    let queryLower = query.toLowerCase();
-
+    
+    // --- HIER KOMMT DER NEUE BLOCK REIN ---
     if (isFunctionSearch) {
         const q = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
         let regex;
-        if (activeTab === 'js') regex = new RegExp(`(?:function\\s+|const\\s+|let\\s+|var\\s+)[a-zA-Z0-9_$]*${q}[a-zA-Z0-9_$]*`, 'gi');
-        else if (activeTab === 'css') regex = new RegExp(`[.#][a-zA-Z0-9_-]*${q}[a-zA-Z0-9_-]*`, 'gi');
-        else if (activeTab === 'html') regex = new RegExp(`(?:<|id="|function\\s+|const\\s+|let\\s+|var\\s+)[a-zA-Z0-9_$]*${q}[a-zA-Z0-9_$]*`, 'gi');
+
+        if (activeTab === 'js') {
+            regex = new RegExp(`(?:function\\s+|const\\s+|let\\s+|var\\s+)${q}[a-zA-Z0-9_$]*`, 'gi');
+        } 
+        else if (activeTab === 'css') {
+            regex = new RegExp(`(?:^|\\s|[>{])([.#]${q}[a-zA-Z0-9_-]*)`, 'gi');
+        } 
+        else if (activeTab === 'html') {
+            regex = new RegExp(`(?:<|id="|class=")${q}[a-zA-Z0-9_$]*`, 'gi');
+        }
 
         if (regex) {
             let match;
             while ((match = regex.exec(text)) !== null) {
-                let keywordMatch = match[0].match(/^(?:function\\s+|const\\s+|let\\s+|var\\s+|<|id=")/i);
-                let offset = keywordMatch ? keywordMatch[0].length : 0;
-                searchMatches.push(match.index + offset);
+                let matchText = match[0];
+                let fullMatch = match[1] || match[0]; 
+                let nameStart = fullMatch.indexOf(query);
+                searchMatches.push(match.index + (matchText.indexOf(fullMatch) + nameStart));
             }
         }
     } else {
+        // Normale Textsuche
+        let queryLower = query.toLowerCase();
         let index = textLower.indexOf(queryLower);
         while (index !== -1) {
             searchMatches.push(index);
             index = textLower.indexOf(queryLower, index + query.length);
         }
     }
+    // --- ENDE DES NEUEN BLOCKS ---
 
     const statusEl = document.getElementById('searchStatus');
     if (statusEl) {
@@ -1126,9 +1162,6 @@ function updateSearch(forceScroll = false) {
 
     if (searchMatches.length > 0) { 
         currentSearchIndex = 0; 
-        // Hier nutzen wir nun forceScroll:
-        // Beim Tippen im Editor kommt 'false' an -> kein Scroll.
-        // Bei Enter/Historie schickst du 'true' -> Sprung erfolgt.
         selectMatch(forceScroll); 
     } else {
         renderHighlights();
@@ -1640,26 +1673,37 @@ Rules:
             showToast(`${filename} wurde heruntergeladen!`, "green");
         }
 
-        function importFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+        // In deiner importFile Funktion, dort wo du die Datei verarbeitest:
+function importFile(event) {
+    const filesList = event.target.files;
+    if (!filesList.length) return;
+
+    for (let file of filesList) {
+        const name = file.name.toLowerCase();
+        let type = '';
+
+        if (name.endsWith('.html')) type = 'html';
+        else if (name.endsWith('.css')) type = 'css';
+        else if (name.endsWith('.js')) type = 'js';
+
+        if (type) {
             const reader = new FileReader();
-            const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-            localStorage.setItem('sc_loadedFileName', baseName);
             reader.onload = (e) => {
-                const content = e.target.result;
-                const name = file.name.toLowerCase();
-                if (name.endsWith('.html')) { files.html = content; files.css = `/* Style für ${file.name} */\n`; files.js = `// Script für ${file.name}\n`; undoStacks.css = [files.css]; undoStacks.js = [files.js]; showToast("HTML geladen", "green"); } 
-                else if (name.endsWith('.css')) { files.css = content; showToast("CSS geladen", "green"); } 
-                else if (name.endsWith('.js')) { files.js = content; showToast("JS geladen", "green"); }
-                undoStacks[activeTab].push(files[activeTab]);
-                localStorage.setItem('sc_project', JSON.stringify(files));
-                switchTab(activeTab, true);
+                files[type] = e.target.result;
+                // --- NEU: Namen merken ---
+                fileNames[type] = file.name;
+                
+                if (activeTab === type) {
+                    editorEl.value = files[type];
+                    updateFileNameUI();
+                    updateLineNumbers();
+                }
+                showToast(`${file.name} geladen`, "blue");
             };
             reader.readAsText(file);
-            toggleSidebar();
-            event.target.value = '';
         }
+    }
+}
 
         switchTab(activeTab, true);
 
@@ -1751,6 +1795,7 @@ function setupInitialState() {
     // 3. UI-Komponenten (Zeilennummern & Scroll-Position) synchronisieren
     updateLineNumbers();
     syncScroll();
+updateFileNameUI();
 }
 
 // Die Initialisierung sofort beim Laden des Skripts ausführen
