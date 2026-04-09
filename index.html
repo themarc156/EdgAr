@@ -324,15 +324,16 @@ mark.search-current {
             
             <div class="relative flex items-center bg-gray-950 border border-gray-700 rounded w-[320px] overflow-hidden focus-within:border-blue-500 transition-colors">
                 <input id="searchInput" type="text" placeholder="Suchen..." 
-                       class="flex-1 bg-transparent px-2 py-1 text-xs text-white outline-none focus:bg-gray-900 transition" 
-                       oninput="updateSearch()" onkeydown="if(event.key==='Enter') findNext()">
+       class="flex-1 bg-transparent px-2 py-1 text-xs text-white outline-none focus:bg-gray-900 transition" 
+       oninput="updateSearch(true)" 
+       onkeydown="if(event.key==='Enter') findNext()">
                 
                 <div class="flex items-center bg-gray-900 border-l border-gray-800 divide-x divide-gray-800">
                     <span id="searchStatus" class="text-[9px] text-gray-500 font-mono px-2">0/0</span>
                     <div class="flex">
-                        <button onclick="findPrev()" class="px-2 py-1 hover:text-white text-gray-400 transition text-[10px]">▲</button>
-                        <button onclick="findNext()" class="px-2 py-1 hover:text-white text-gray-400 transition text-[10px]">▼</button>
-                    </div>
+    <button onclick="findPrev()" class="px-2 py-1 hover:text-white text-gray-400 transition text-[10px]">▲</button>
+    <button onclick="findNext()" class="px-2 py-1 hover:text-white text-gray-400 transition text-[10px]">▼</button>
+</div>
                     <button onclick="clearSearch()" class="px-2 py-1 text-gray-500 hover:text-red-400 text-[10px]">✕</button>
                 </div>
             </div>
@@ -361,7 +362,15 @@ mark.search-current {
             <div id="editorContainer" class="flex-1 relative overflow-hidden bg-[#0d1117]">
                 <div id="lineNumbers">1</div>
                 <div id="searchBackdrop"></div>
-                <textarea id="mainEditor" autofocus spellcheck="false" oninput="onEditorInput(event)" onscroll="onEditorScroll()" onclick="handleEditorClick()" placeholder="Code hier eingeben..."></textarea>
+                <textarea id="mainEditor" 
+          autofocus 
+          spellcheck="false" 
+          oninput="onEditorInput(event)" 
+          onscroll="onEditorScroll()" 
+          onclick="handleEditorClick()" 
+          onpaste="handlePaste(event)" 
+          placeholder="Code hier eingeben...">
+</textarea>
                 
                 <div id="scrollMap" onclick="handleScrollMapClick(event)"></div>
             </div> </div> <div class="hidden md:flex w-[30%] flex-col bg-gray-900 border-l border-gray-800 shadow-2xl overflow-hidden">
@@ -513,6 +522,7 @@ isReadOnly = isSmartSelectActive;
     }
 }
 
+
         function handleEditorClick() {
     if (!isSmartSelectActive) return;
 
@@ -558,6 +568,8 @@ isReadOnly = isSmartSelectActive;
         showToast(`Block markiert (${lineCount} Zeilen)`, "blue");
     }
 }
+
+
 
 function goToLine() {
     const lineInput = document.getElementById('lineInput');
@@ -653,7 +665,32 @@ function goToLine() {
 
 
 
+function handlePaste(e) {
+    // 1. Sicherstellen, dass wir den Editor haben
+    const editor = e.target; 
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
 
+    // 2. NUR eingreifen, wenn wirklich Text markiert ist
+    // Wenn nichts markiert ist, lassen wir den Browser das Standard-Paste machen
+    if (start === end) return; 
+
+    // 3. Wenn Text markiert ist, manuell ersetzen
+    e.preventDefault();
+    const pasteText = (e.clipboardData || window.clipboardData).getData('text');
+    const currentText = editor.value;
+
+    editor.value = currentText.substring(0, start) + pasteText + currentText.substring(end);
+
+    // Cursor-Position korrigieren
+    const newPos = start + pasteText.length;
+    editor.setSelectionRange(newPos, newPos);
+
+    // WICHTIG: Deine Input-Funktion aufrufen, damit Zeilennummern etc. aktualisiert werden
+    if (typeof onEditorInput === "function") {
+        onEditorInput();
+    }
+}
 
 
 
@@ -916,9 +953,10 @@ function toggleFunctionSearch() {
     updateSearch();
 }
 
-function updateSearch() {
+// Wir fügen forceScroll hinzu (Standard ist false)
+function updateSearch(forceScroll = false) {
     const input = document.getElementById('searchInput');
-    if (!input) return; // Sicherheits-Check
+    if (!input) return;
 
     const query = input.value.trim();
     const text = editorEl.value;
@@ -930,12 +968,10 @@ function updateSearch() {
         window.historyTimer = setTimeout(() => addToHistory(query), 1500);
     }
 
-    // WICHTIG: Hier war der Fehler! 
-    // Wir prüfen NUR noch, ob die Query leer ist. 
-    // Die Prüfung auf 'searchPanel' (das es nicht mehr gibt) ist weg.
     if (!query) { 
         backdropEl.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
-        document.getElementById('searchStatus').innerText = "0/0"; 
+        const statusEl = document.getElementById('searchStatus');
+        if (statusEl) statusEl.innerText = "0/0"; 
         renderHighlights(); 
         updateScrollMap();
         return; 
@@ -967,7 +1003,6 @@ function updateSearch() {
         }
     }
 
-    // Status Anzeige aktualisieren
     const statusEl = document.getElementById('searchStatus');
     if (statusEl) {
         statusEl.innerText = searchMatches.length > 0 ? `1/${searchMatches.length}` : "0/0";
@@ -975,9 +1010,13 @@ function updateSearch() {
 
     if (searchMatches.length > 0) { 
         currentSearchIndex = 0; 
-        selectMatch(); 
+        // Hier nutzen wir nun forceScroll:
+        // Beim Tippen im Editor kommt 'false' an -> kein Scroll.
+        // Bei Enter/Historie schickst du 'true' -> Sprung erfolgt.
+        selectMatch(forceScroll); 
+    } else {
+        renderHighlights();
     }
-    renderHighlights();
     updateScrollMap();
 }
 
@@ -1030,8 +1069,9 @@ function renderHistory() {
         badge.onclick = () => {
     const input = document.getElementById('searchInput');
     input.value = term;
-    input.focus(); // Setzt den Fokus zurück, damit man direkt weitertippen kann
-    updateSearch();
+    input.focus(); 
+    // Das 'true' hier sorgt dafür, dass EdgAr sofort zum Treffer springt!
+    updateSearch(true); 
 };
         container.appendChild(badge);
     });
@@ -1091,24 +1131,41 @@ function renderHighlights() {
 
         function escapeHtml(text) { return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
-        function selectMatch() {
-            renderHighlights();
-            document.getElementById('searchStatus').innerText = `${currentSearchIndex + 1}/${searchMatches.length}`;
-            const activeMark = backdropEl.querySelector('mark.search-current');
-            if (activeMark) {
-                const editorRect = editorEl.getBoundingClientRect();
-                const relativeMarkTop = activeMark.offsetTop;
-                const targetScroll = relativeMarkTop - (editorRect.height / 3);
-                editorEl.scrollTop = targetScroll;
-                backdropEl.scrollTop = targetScroll;
-                syncScroll();
-            }
-updateScrollMap();
-        }
+        // Wir fügen den Parameter 'shouldScroll' hinzu (Standard: false)
+function selectMatch(shouldScroll = false) {
+    renderHighlights();
+    
+    const statusEl = document.getElementById('searchStatus');
+    if (statusEl) {
+        statusEl.innerText = `${currentSearchIndex + 1}/${searchMatches.length}`;
+    }
 
-        function findNext() { if (searchMatches.length === 0) return; currentSearchIndex = (currentSearchIndex + 1) % searchMatches.length; selectMatch(); }
-        function findPrev() { if (searchMatches.length === 0) return; currentSearchIndex = (currentSearchIndex - 1 + searchMatches.length) % searchMatches.length; selectMatch(); }
+    const activeMark = backdropEl.querySelector('mark.search-current');
+    
+    // NUR scrollen, wenn shouldScroll explizit auf true gesetzt wurde
+    if (activeMark && shouldScroll) {
+        const editorRect = editorEl.getBoundingClientRect();
+        const relativeMarkTop = activeMark.offsetTop;
+        const targetScroll = relativeMarkTop - (editorRect.height / 3);
+        
+        editorEl.scrollTop = targetScroll;
+        backdropEl.scrollTop = targetScroll;
+        syncScroll();
+    }
+    updateScrollMap();
+}
 
+        function findNext() { 
+    if (searchMatches.length === 0) return; 
+    currentSearchIndex = (currentSearchIndex + 1) % searchMatches.length; 
+    selectMatch(true); // <--- Hier 'true' hinzufügen
+}
+
+function findPrev() { 
+    if (searchMatches.length === 0) return; 
+    currentSearchIndex = (currentSearchIndex - 1 + searchMatches.length) % searchMatches.length; 
+    selectMatch(true); // <--- Hier 'true' hinzufügen
+}
         function updateCurrentFile() { files[activeTab] = editorEl.value; localStorage.setItem('sc_project', JSON.stringify(files)); }
 
         function switchTab(tab, isInitial = false) {
