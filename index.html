@@ -255,9 +255,10 @@ mark.search-current {
                     <span class="font-semibold">Datei öffnen</span>
                     <input type="file" id="fileInput" onchange="importFile(event)" multiple>
                 </label>
-                <button onclick="saveAsProject(); toggleSidebar();" class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md transition text-left">
-                    <span class="text-green-500 text-lg">📥</span><span class="font-semibold ml-3">Speichern unter...</span>
-                </button>
+                <button onclick="saveProjectDirectly(); toggleSidebar();" class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md transition text-left">
+    <span class="text-green-500 text-lg">💾</span>
+    <span class="font-semibold ml-3">Speichern unter...</span>
+</button>
                 <button onclick="splitHtmlStructure(); toggleSidebar();" class="w-full flex items-center space-x-3 px-4 py-3 text-sm text-gray-200 hover:bg-gray-800 rounded-md transition text-left">
                     <span class="text-purple-500 text-lg">✂️</span><span class="font-semibold ml-3">HTML zerlegen</span>
                 </button>
@@ -435,6 +436,12 @@ mark.search-current {
         let promptQueue = [];
 let snapshotTimer; // Hält die Referenz für die Verzögerung
 
+let fileHandles = {
+    html: null,
+    css: null,
+    js: null
+};
+
         let files = {
             html: `<!DOCTYPE html>\n<html>\n<head>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <h1 style="color: #333; margin-top: 20px;">Projekt bereit</h1>\n  <button id="btn" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer;">Klick mich</button>\n  <script src="script.js"><\/script>\n</body>\n</html>`,
             css: `body { background: #f4f4f4; color: #333; text-align: center; font-family: sans-serif; }\n.openlibrary { border: 1px solid blue; }`,
@@ -536,6 +543,58 @@ isReadOnly = isSmartSelectActive;
     }
 }
 
+async function saveProjectDirectly() {
+    updateCurrentFile(); // Aktuellen Editor-Stand in 'files' Objekt sichern
+    const content = files[activeTab];
+    
+    try {
+        // Falls wir für diesen Tab noch keine Datei verknüpft haben, fragen wir nach
+        if (!fileHandles[activeTab]) {
+            const options = {
+                suggestedName: activeTab === 'html' ? 'index.html' : (activeTab === 'css' ? 'style.css' : 'script.js'),
+                types: [{
+                    description: 'Web Datei',
+                    accept: { 'text/plain': [`.${activeTab}`] },
+                }],
+            };
+            fileHandles[activeTab] = await window.showSaveFilePicker(options);
+        }
+
+        // Schreibzugriff vorbereiten
+        const writable = await fileHandles[activeTab].createWritable();
+        await writable.write(content);
+        await writable.close();
+
+        showToast(`${activeTab.toUpperCase()} direkt gespeichert! 💾`, "green");
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            console.error(err);
+            showToast("Speichern fehlgeschlagen", "red");
+        }
+    }
+}
+
+async function openFileWithAPI() {
+    try {
+        const [handle] = await window.showOpenFilePicker();
+        const file = await handle.getFile();
+        const content = await file.text();
+        const ext = file.name.split('.').pop().toLowerCase();
+
+        if (['html', 'css', 'js'].includes(ext)) {
+            fileHandles[ext] = handle; // Handle für späteres Speichern merken
+            files[ext] = content;
+            
+            // UI aktualisieren
+            if (activeTab === ext) {
+                switchTab(ext, true);
+            }
+            showToast(`${file.name} geladen & verknüpft 🔗`, "blue");
+        }
+    } catch (err) {
+        console.error("Laden abgebrochen");
+    }
+}
 
 function handleEditorClick(e) {
     // Prüfe: Ist der Button aktiv ODER wird Strg (Windows) / Cmd (Mac) gehalten?
