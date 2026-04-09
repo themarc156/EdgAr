@@ -367,7 +367,7 @@ mark.search-current {
           spellcheck="false" 
           oninput="onEditorInput(event)" 
           onscroll="onEditorScroll()" 
-          onclick="handleEditorClick()" 
+          onclick="handleEditorClick(event)" 
           onpaste="handlePaste(event)" 
           placeholder="Code hier eingeben...">
 </textarea>
@@ -411,6 +411,20 @@ mark.search-current {
             </div>
         </div>
     </div> 
+<div id="previewDrawer" class="hidden fixed inset-0 z-[100] bg-black flex flex-col">
+    <div class="h-12 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4">
+        <div class="flex items-center space-x-2">
+            <span class="text-green-500">●</span>
+            <span class="text-xs font-bold uppercase tracking-widest text-gray-300">Live Vorschau</span>
+        </div>
+        <div class="flex items-center space-x-3">
+            <button onclick="toggleBrowserFullscreen()" class="text-gray-400 hover:text-white text-sm">⛶</button>
+            <button onclick="closePreview()" class="bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white px-4 py-1 rounded text-xs font-bold transition">Schließen</button>
+        </div>
+    </div>
+    <iframe id="previewFrame" class="w-full flex-1 bg-white"></iframe>
+</div>
+
 </body>
 
     <script>
@@ -523,8 +537,17 @@ isReadOnly = isSmartSelectActive;
 }
 
 
-        function handleEditorClick() {
-    if (!isSmartSelectActive) return;
+function handleEditorClick(e) {
+    // Prüfe: Ist der Button aktiv ODER wird Strg (Windows) / Cmd (Mac) gehalten?
+    const isCtrlPressed = e && (e.ctrlKey || e.metaKey);
+    
+    if (!isSmartSelectActive && !isCtrlPressed) return;
+
+    // Falls Strg gedrückt wurde, verhindern wir, dass der Cursor 
+    // einfach nur versetzt wird, damit die Markierung sauber greift.
+    if (isCtrlPressed) {
+        e.preventDefault();
+    }
 
     const pos = editorEl.selectionStart;
     const text = editorEl.value;
@@ -532,7 +555,7 @@ isReadOnly = isSmartSelectActive;
     let start = pos;
     let end = pos;
 
-    // Suche nach oben
+    // Suche nach oben (bis zum Blockanfang oder zwei Zeilenumbrüchen)
     let bracketCount = 0;
     for (let i = pos - 1; i >= 0; i--) {
         if (text[i] === '}') bracketCount++;
@@ -545,7 +568,7 @@ isReadOnly = isSmartSelectActive;
         if (i === 0) start = 0;
     }
 
-    // Suche nach unten
+    // Suche nach unten (bis zum Blockende oder zwei Zeilenumbrüchen)
     bracketCount = 0;
     for (let i = pos; i < text.length; i++) {
         if (text[i] === '{') bracketCount++;
@@ -558,14 +581,13 @@ isReadOnly = isSmartSelectActive;
         if (i === text.length - 1) end = text.length;
     }
 
-    // Nur setzen, wenn tatsächlich ein Bereich gefunden wurde, 
-    // um ein "Zucken" der Markierung zu verhindern
     if (start !== end) {
         editorEl.setSelectionRange(start, end);
-        // Fokus behalten, damit die Markierung sichtbar bleibt
         editorEl.focus(); 
+        
         const lineCount = text.substring(start, end).split('\n').length;
-        showToast(`Block markiert (${lineCount} Zeilen)`, "blue");
+        const modeLabel = isCtrlPressed ? "Quick-Select" : "Smart-Select";
+        showToast(`${modeLabel}: ${lineCount} Zeilen`, "blue");
     }
 }
 
@@ -1372,8 +1394,16 @@ async function callAiApi(fullPrompt) {
         }
 
         function closePreview() { document.getElementById('previewDrawer').classList.add('hidden'); }
-        function toggleBrowserFullscreen() { document.documentElement.requestFullscreen(); }
-        function saveProject() { updateCurrentFile(); showToast("Gespeichert!", "green"); }
+function toggleBrowserFullscreen() {
+    const pf = document.getElementById('previewFrame');
+    if (pf.requestFullscreen) {
+        pf.requestFullscreen();
+    } else if (pf.webkitRequestFullscreen) { /* Safari support */
+        pf.webkitRequestFullscreen();
+    } else if (pf.msRequestFullscreen) { /* IE11 support */
+        pf.msRequestFullscreen();
+    }
+}        function saveProject() { updateCurrentFile(); showToast("Gespeichert!", "green"); }
         function clearAiInput() { document.getElementById('aiInput').value = ""; showToast("Geleert", "blue"); }
         function insertChar(char) {
             if (isReadOnly) return;
