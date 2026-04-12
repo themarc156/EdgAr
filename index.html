@@ -835,6 +835,7 @@ let codeSnapshots = {
         let searchMatches = [];
 
         let currentSearchIndex = -1;
+let searchHistory = [];
 
         const savedFiles = localStorage.getItem('sc_project');
 
@@ -2398,7 +2399,7 @@ function updateSearch(forceScroll = false) {
 }
 
 
-let searchHistory = JSON.parse(localStorage.getItem('sc_searchHistory') || "[]");
+searchHistory = JSON.parse(localStorage.getItem('sc_searchHistory') || "[]");
 
 
 
@@ -3616,7 +3617,37 @@ window.onload = () => {
     console.log("EdgAr IDE: System bereit. Viel Erfolg!");
 };
 
+// --- SUCHFELD LOGIK (HISTORIE & LIVE-SUCHE) ---
+// Wir deklarieren sInput hier NUR EINMAL
+const sInput = document.getElementById('searchInput');
 
+if (sInput) {
+    // 1. LIVE-SUCHE: Markiert Treffer sofort beim Tippen
+    sInput.addEventListener('input', () => {
+        if (typeof updateSearch === 'function') {
+            updateSearch(false); // false = markieren ohne zu springen
+        }
+    });
+
+    // 2. ENTER-TASTE: Speichern & zum Treffer springen
+    sInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const query = sInput.value.trim();
+            
+            // In Historie speichern
+            if (typeof addToHistory === 'function') {
+                addToHistory(query);
+            }
+            
+            // Suche ausführen und zum Treffer scrollen (true)
+            if (typeof updateSearch === 'function') {
+                updateSearch(true); 
+            }
+        }
+    });
+}
+
+// Ende des Skripts
 
 // Ende des Skripts
 
