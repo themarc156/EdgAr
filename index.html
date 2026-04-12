@@ -3617,37 +3617,47 @@ window.onload = () => {
     console.log("EdgAr IDE: System bereit. Viel Erfolg!");
 };
 
-// --- SUCHFELD LOGIK (HISTORIE & LIVE-SUCHE) ---
-// Wir deklarieren sInput hier NUR EINMAL
+// --- SUCHFELD LOGIK (HISTORIE & LIVE-SUCHE MIT AUTO-SAVE) ---
 const sInput = document.getElementById('searchInput');
+let historyTimer; // Der Timer für das automatische Speichern
 
 if (sInput) {
-    // 1. LIVE-SUCHE: Markiert Treffer sofort beim Tippen
+    // 1. LIVE-SUCHE & AUTO-SAVE
     sInput.addEventListener('input', () => {
+        // Sofortige Suche (Markierungen zeichnen)
         if (typeof updateSearch === 'function') {
-            updateSearch(false); // false = markieren ohne zu springen
+            updateSearch(false); 
         }
+
+        // Auto-Save Logik: Timer zurücksetzen
+        clearTimeout(historyTimer);
+        
+        // Nach 2 Sekunden Stillstand speichern
+        historyTimer = setTimeout(() => {
+            const query = sInput.value.trim();
+            if (query && query.length > 2 && typeof addToHistory === 'function') {
+                addToHistory(query);
+                console.log("📌 Auto-Save Historie:", query);
+            }
+        }, 2000); // 2000ms = 2 Sekunden
     });
 
-    // 2. ENTER-TASTE: Speichern & zum Treffer springen
+    // 2. ENTER-TASTE: Sofort speichern & zum Treffer springen
     sInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
+            clearTimeout(historyTimer); // Timer stoppen, da wir manuell speichern
             const query = sInput.value.trim();
             
-            // In Historie speichern
             if (typeof addToHistory === 'function') {
                 addToHistory(query);
             }
             
-            // Suche ausführen und zum Treffer scrollen (true)
             if (typeof updateSearch === 'function') {
                 updateSearch(true); 
             }
         }
     });
 }
-
-// Ende des Skripts
 
 // Ende des Skripts
 
