@@ -1396,16 +1396,17 @@ function updateSearch(forceScroll = false) {
     if (isFModus) {
         const q = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         
-        // 1. JS-Funktionen: Bleibt streng (Definitionen)
-        const jsFunc = `(?:function\\s+${q}[a-zA-Z0-9_-]*|${q}[a-zA-Z0-9_-]*\\s*=\\s*\\([^)]*\\)\\s*=>|${q}[a-zA-Z0-9_-]*\\s*\\([^)]*\\)\\s*\\{)`;
+        // 1. JS-Funktionen: Flexibler bei Leerzeichen, erkennt Definitionen
+        // Erlaubt jetzt beliebige Zeichen davor (solange es kein Punkt ist -> Aufruf-Schutz)
+        const jsFunc = `(?:(?:function\\s+|const\\s+|let\\s+|var\\s+)?${q}[a-zA-Z0-9_-]*\\s*=\\s*\\([^)]*\\)\\s*=>|(?:function\\s+)${q}[a-zA-Z0-9_-]*|${q}[a-zA-Z0-9_-]*\\s*\\([^)]*\\)\\s*\\{)`;
         
-        // 2. JS-Variablen: Bleibt bei Deklarationen
+        // 2. JS-Variablen: Deklarationen
         const jsVars = `(?:(?:var|let|const)\\s+${q}[a-zA-Z0-9_-]*)`;
         
-        // 3. Events: NUR noch addEventListener (onclick wird ignoriert)
+        // 3. Events: Nur addEventListener
         const events = `(?:addEventListener\\s*\\(\\s*['"]${q}[a-zA-Z0-9_-]*)`;
         
-        // 4. CSS & HTML: IDs, Klassen und Tags (Keine Attribute wie onclick)
+        // 4. CSS & HTML: IDs, Klassen, Tags
         const structure = `(?:<${q}[a-zA-Z0-9_-]*|[#\\.][a-zA-Z0-9_-]*${q}[a-zA-Z0-9_-]*(?=[^{}]*\\{)|\\s(?:id|class)=["']${q}[a-zA-Z0-9_-]*)`;
 
         const combinedRegex = new RegExp(`(${jsFunc}|${jsVars}|${events}|${structure})`, 'gi');
