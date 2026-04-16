@@ -1,646 +1,918 @@
 <!DOCTYPE html>
-
 <html lang="de">
-
-<head>
-
+  <head>
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
     <title>EdgAr IDE v3.9.2 - Full Integration Fix</title>
-
     <script src="https://cdn.tailwindcss.com"></script>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
-
     <style>
+      :root {
+        --bg-edgar: #090d14;
+        --bg-editor: #0d1117;
+        --bg-header: #1f2937;
+        --bg-toolbar: #1a202c;
+      }
 
-        :root { --bg-edgar: #090d14; --bg-editor: #0d1117; --bg-header: #1f2937; --bg-toolbar: #1a202c; }
+      body {
+        background-color: var(--bg-edgar);
+        margin: 0;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        font-family: sans-serif;
+      }
 
-        body { background-color: var(--bg-edgar); margin: 0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; font-family: sans-serif; }
+      /* SIDEBAR FIX */
+      #sidebar {
+        transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        width: 0;
+        min-width: 0;
+        overflow: hidden;
+        background: #0d1117;
+        display: flex;
+        flex-direction: column;
+        z-index: 50;
+      }
 
-        
+      #sidebar.open {
+        width: 260px;
+        border-right: 1px solid #000;
+      }
 
-        /* SIDEBAR FIX */
+      .sidebar-content {
+        width: 260px;
+      } /* Verhindert Textumbruch beim Sliden */
+      .tab-btn {
+        color: #9ca3af;
+        font-size: 10px;
+        font-family: monospace;
+        white-space: nowrap;
+      }
 
-        #sidebar { 
+      .tab-active {
+        border-bottom: 3px solid #3b82f6 !important;
+        color: #3b82f6 !important;
+        background: #1f2937 !important;
+      }
 
-            transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
+      .badge {
+        font-size: 9px;
+        font-weight: bold;
+        padding: 2px 8px;
+        border-radius: 3px;
+        border: 1px solid rgba(255,255,255,0.08);
+        transition: 0.2s;
+        cursor: pointer;
+      }
 
-            width: 0; 
+      .badge-blue {
+        background: rgba(30, 58, 138, 0.4);
+        color: #60a5fa;
+        border-color: rgba(59, 130, 246, 0.3);
+      }
 
-            min-width: 0;
+      .badge-yellow {
+        background: rgba(113, 63, 18, 0.4);
+        color: #facc15;
+        border-color: rgba(234, 179, 8, 0.3);
+      }
 
-            overflow: hidden; 
+      .badge-active {
+        background: #2563eb;
+        color: white;
+        border-color: #60a5fa;
+      }
 
-            background: #0d1117; 
+      .search-tag {
+        background: #2d3748;
+        color: #a0aec0;
+        font-size: 9px;
+        padding: 1px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
 
-            display: flex;
+      ::-webkit-scrollbar {
+        width: 14px;
+        height: 12px;
+      }
 
-            flex-direction: column;
+      ::-webkit-scrollbar-track {
+        background: #0d1117;
+      }
 
-            z-index: 50;
-
-        }
-
-        #sidebar.open { 
-
-            width: 260px; 
-
-            border-right: 1px solid #000; 
-
-        }
-
-        .sidebar-content { width: 260px; } /* Verhindert Textumbruch beim Sliden */
-
-
-
-        .tab-btn { color: #9ca3af; font-size: 10px; font-family: monospace; white-space: nowrap; }
-
-        .tab-active { border-bottom: 3px solid #3b82f6 !important; color: #3b82f6 !important; background: #1f2937 !important; }
-
-        
-
-        .badge { font-size: 9px; font-weight: bold; padding: 2px 8px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.08); transition: 0.2s; cursor: pointer; }
-
-        .badge-blue { background: rgba(30, 58, 138, 0.4); color: #60a5fa; border-color: rgba(59, 130, 246, 0.3); }
-
-        .badge-yellow { background: rgba(113, 63, 18, 0.4); color: #facc15; border-color: rgba(234, 179, 8, 0.3); }
-
-        .badge-active { background: #2563eb; color: white; border-color: #60a5fa; }
-
-
-
-        .search-tag { background: #2d3748; color: #a0aec0; font-size: 9px; padding: 1px 8px; border-radius: 4px; cursor: pointer; }
-
-        
-
-        ::-webkit-scrollbar { width: 14px; height: 12px; }
-
-        ::-webkit-scrollbar-track { background: #0d1117; }
-
-        ::-webkit-scrollbar-thumb { background: #484f58; border-radius: 4px; border: 3px solid #0d1117; }
-
+      ::-webkit-scrollbar-thumb {
+        background: #484f58;
+        border-radius: 4px;
+        border: 3px solid #0d1117;
+      }
     </style>
-
-</head>
-
-<body>
-
-
-
+  </head>
+  <body>
     <div class="flex flex-1 overflow-hidden">
-
-
-
-        <aside id="sidebar">
-
-    <div class="sidebar-content">
-
-        <div class="p-3 border-b border-black text-[10px] font-bold text-gray-500 uppercase tracking-widest flex justify-between items-center bg-[#1a202c]">
-
+      <aside id="sidebar">
+        <div class="sidebar-content">
+          <div class="p-3 border-b border-black text-[10px] font-bold text-gray-500 uppercase tracking-widest flex justify-between items-center bg-[#1a202c]">
             <span>Projekt Explorer</span>
+          </div>
 
-        </div>
+          <div class="p-2 border-b border-black space-y-1 bg-[#111827]">
+            <button onclick="createNewFile()" class="w-full text-left px-2 py-1.5 text-[11px] text-gray-300 hover:bg-blue-600 hover:text-white rounded flex items-center transition-colors">
+              <span class="mr-2">📄</span> Neu
+            </button>
+            <button onclick="openLocalFile()" class="w-full text-left px-2 py-1.5 text-[11px] text-gray-300 hover:bg-blue-600 hover:text-white rounded flex items-center transition-colors">
+              <span class="mr-2">📂</span> Datei öffnen
+            </button>
+            <button onclick="saveFileAs()" class="w-full text-left px-2 py-1.5 text-[11px] text-gray-300 hover:bg-blue-600 hover:text-white rounded flex items-center transition-colors border-b border-gray-800 pb-2 mb-1">
+              <span class="mr-2">💾</span> Speichern unter...
+            </button>
+          </div>
 
-
-
-        <div class="p-2 border-b border-black space-y-1 bg-[#111827]">
-
-    <button onclick="createNewFile()" class="w-full text-left px-2 py-1.5 text-[11px] text-gray-300 hover:bg-blue-600 hover:text-white rounded flex items-center transition-colors">
-
-        <span class="mr-2">📄</span> Neu
-
-    </button>
-
-    <button onclick="openLocalFile()" class="w-full text-left px-2 py-1.5 text-[11px] text-gray-300 hover:bg-blue-600 hover:text-white rounded flex items-center transition-colors">
-
-        <span class="mr-2">📂</span> Datei öffnen
-
-    </button>
-
-    <button onclick="saveFileAs()" class="w-full text-left px-2 py-1.5 text-[11px] text-gray-300 hover:bg-blue-600 hover:text-white rounded flex items-center transition-colors border-b border-gray-800 pb-2 mb-1">
-
-        <span class="mr-2">💾</span> Speichern unter...
-
-    </button>
-
-</div>
-
-
-
-        <div class="flex-1 p-2 space-y-1 text-xs text-gray-400 font-mono">
-
+          <div class="flex-1 p-2 space-y-1 text-xs text-gray-400 font-mono">
             <div class="text-blue-400 p-1 hover:bg-gray-800 rounded cursor-pointer flex items-center">
-
-                <span class="mr-1">📁</span> src
-
+              <span class="mr-1">📁</span> src
             </div>
 
             <div class="pl-4 p-1 hover:bg-gray-800 rounded cursor-pointer flex items-center">
-
-                <span class="mr-1 text-orange-400"><html></span> index.html
-
+              <span class="mr-1 text-orange-400"><html></span> index.html
             </div>
 
             <div class="pl-4 p-1 hover:bg-gray-800 rounded cursor-pointer flex items-center">
-
-                <span class="mr-1 text-blue-400">#</span> style.css
-
+              <span class="mr-1 text-blue-400">#</span> style.css
             </div>
-
+          </div>
         </div>
+      </aside>
 
-    </div>
+      <div class="flex-1 flex flex-col border-r border-black min-w-0">
+        <header class="h-12 px-3 bg-[#1f2937] border-b border-black flex items-center justify-between shrink-0">
+          <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2">
+              <button onclick="toggleSidebar()" class="text-white text-xl hover:text-blue-400 transition-colors w-8 h-8 flex items-center justify-center">☰</button>
+              <h1 class="text-sm font-bold text-blue-400">Edg<span class="text-white">Ar</span></h1>
+            </div>
 
-</aside>
+            <div class="flex bg-gray-900 rounded-md p-1 border border-gray-700">
+              <button class="tab-btn tab-active px-3 py-1 rounded-sm">index.html</button>
+              <button class="tab-btn px-3 py-1 rounded-sm">style.css</button>
+            </div>
+          </div>
 
+          <div class="flex items-center space-x-1 h-8">
+            <button onclick="magicFix()" class="bg-gray-700 hover:bg-gray-600 w-8 h-full rounded text-sm transition">🪄</button>
+            <button onclick="runCode()" class="bg-green-600 hover:bg-green-500 px-4 h-full rounded text-[10px] font-bold uppercase transition">Run</button>
+          </div>
+        </header>
 
+        <div class="bg-[#1a202c] p-2 pl-4 border-b border-black flex flex-col z-30 shrink-0">
+          <div class="flex items-center w-full">
+            <div class="flex items-center space-x-2">
+              <button onclick="toggleFunctionSearch()" class="bg-gray-800 text-gray-400 font-bold w-8 h-7 flex items-center justify-center rounded text-xs border border-gray-700 hover:bg-gray-700 transition">ƒ</button>
 
-        <div class="flex-1 flex flex-col border-r border-black min-w-0">
-
-            <header class="h-12 px-3 bg-[#1f2937] border-b border-black flex items-center justify-between shrink-0">
-
-                <div class="flex items-center space-x-4">
-
-                    <div class="flex items-center space-x-2">
-
-                        <button onclick="toggleSidebar()" class="text-white text-xl hover:text-blue-400 transition-colors w-8 h-8 flex items-center justify-center">☰</button>
-
-                        <h1 class="text-sm font-bold text-blue-400">Edg<span class="text-white">Ar</span></h1>
-
-                    </div>
-
-                    <div class="flex bg-gray-900 rounded-md p-1 border border-gray-700">
-
-                        <button class="tab-btn tab-active px-3 py-1 rounded-sm">index.html</button>
-
-                        <button class="tab-btn px-3 py-1 rounded-sm">style.css</button>
-
-                    </div>
-
-                </div>
-
-                <div class="flex items-center space-x-1 h-8">
-
-    <button class="bg-gray-700 hover:bg-gray-600 w-8 h-full rounded text-sm transition">🪄</button>
-
-    <button onclick="runCode()" class="bg-green-600 hover:bg-green-500 px-4 h-full rounded text-[10px] font-bold uppercase transition">Run</button>
-
-</div>
-
-            </header>
-
-            <div class="bg-[#1a202c] p-2 pl-4 border-b border-black flex flex-col z-30 shrink-0">
-    <div class="flex items-center w-full">
-        <div class="flex items-center space-x-2">
-            <button onclick="toggleFunctionSearch()" class="bg-gray-800 text-gray-400 font-bold w-8 h-7 flex items-center justify-center rounded text-xs border border-gray-700 hover:bg-gray-700 transition">ƒ</button>
-            
-            <div class="relative flex items-center bg-gray-950 border border-gray-700 rounded w-[320px] overflow-hidden focus-within:border-blue-500">
+              <div class="relative flex items-center bg-gray-950 border border-gray-700 rounded w-[320px] overflow-hidden focus-within:border-blue-500">
                 <input type="text" id="searchInput" placeholder="Suchen..." class="flex-1 bg-transparent px-2 py-1 text-xs text-white outline-none">
                 <div class="flex items-center border-l border-gray-800 bg-gray-900/50 h-full">
-                    <span id="searchCount" class="px-2 text-[10px] text-gray-500 font-mono border-r border-gray-800">0/0</span>
-                    <button onclick="navigateSearch('prev')" class="px-2 hover:text-blue-400 text-gray-500 text-[10px]">▲</button>
-                    <button onclick="navigateSearch('next')" class="px-2 hover:text-blue-400 text-gray-500 text-[10px]">▼</button>
-                    <button onclick="clearSearch()" class="px-2 hover:text-red-400 text-gray-500 border-l border-gray-800 text-[10px]">✕</button>
-                </div>
+                <span id="searchCount" class="px-2 text-[10px] text-gray-500 font-mono border-r border-gray-800">0/0</span>
+                <button onclick="navigateSearch('prev')" class="px-2 hover:text-blue-400 text-gray-500 text-[10px]">▲</button>
+                <button onclick="navigateSearch('next')" class="px-2 hover:text-blue-400 text-gray-500 text-[10px]">▼</button>
+                <button onclick="clearSearch()" class="px-2 hover:text-red-400 text-gray-500 border-l border-gray-800 text-[10px]">✕</button>
+              </div>
             </div>
 
             <div class="flex items-center space-x-1 ml-4">
-                <button onclick="jumpToSection('top')" class="badge badge-blue">TOP/END ↕</button>
-                <button onclick="jumpToSection('style')" class="badge badge-yellow">STYLE</button>
-                <button onclick="jumpToSection('html')" class="badge badge-blue">BODY</button>
-                <button onclick="jumpToSection('script')" class="badge badge-active">SCRIPT</button>
+              <button onclick="jumpToSection('top')" oncontextmenu="selectSection('top');
+              return false;
+              " class="badge badge-blue">TOP/END ↕</button>
+              <button onclick="jumpToSection('style')" oncontextmenu="selectSection('style');
+              return false;
+              " class="badge badge-yellow">STYLE</button>
+              <button onclick="jumpToSection('html')" oncontextmenu="selectSection('html');
+              return false;
+              " class="badge badge-blue">BODY</button>
+              <button onclick="jumpToSection('script')" oncontextmenu="selectSection('script');
+              return false;
+              " class="badge badge-active">SCRIPT</button>
             </div>
-        </div>
+          </div>
 
-        <div class="flex-1"></div>
+          <div class="flex-1"></div>
 
-        <div class="flex items-center space-x-1 pr-2">
+          <div class="relative group mr-4">
+            <button class="bg-gray-800 hover:bg-gray-700 text-[10px] font-bold text-purple-400 px-3 py-1 rounded border border-gray-700 transition flex items-center">
+              PROMPT <span class="ml-1 text-[8px] opacity-50">▼</span>
+            </button>
+
+            <div class="absolute right-0 top-full pt-2 w-48 hidden group-hover:block z-50">
+              <div class="bg-gray-900 border border-gray-700 rounded shadow-2xl p-1 flex flex-col space-y-0.5">
+                <button onclick="insertPrompt('Aktuell so: ')" class="text-left px-3 py-2 text-[10px] text-gray-300 hover:bg-blue-600 hover:text-white rounded transition">
+                  "Aktuell so: "
+                </button>
+                <button onclick="insertPrompt('Das komplett ersetzen?')" class="text-left px-3 py-2 text-[10px] text-gray-300 hover:bg-blue-600 hover:text-white rounded transition border-t border-gray-800">
+                  "Das komplett ersetzen?"
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-1 pr-2">
             <div class="flex items-center bg-gray-950 border border-gray-700 rounded overflow-hidden w-[65px]">
-                <span class="pl-2 text-gray-600 text-[10px] font-bold">#</span>
-                <input type="number" id="lineInput" placeholder="Go" class="w-full bg-transparent px-1 py-1 text-[10px] text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+              <span class="pl-2 text-gray-600 text-[10px] font-bold">#</span>
+              <input type="number" id="lineInput" placeholder="Go" class="w-full bg-transparent px-1 py-1 text-[10px] text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
             </div>
             <button onclick="jumpToLine()" class="bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded border border-gray-700 text-[10px] text-gray-400">Go</button>
+          </div>
         </div>
-    </div>
 
-    <div id="searchHistory" class="flex items-center mt-1.5 space-x-2 ml-[40px]"></div>
+        <div id="searchHistory" class="flex items-center mt-1.5 space-x-2 ml-[40px]"></div>
+      </div>
+
+      <div id="editorContainer" class="flex-1 relative bg-[#0d1117]"></div>
+    </div> <div class="w-[30%] flex flex-col bg-gray-900 shrink-0 border-l border-black">
+
+    <header class="h-12 bg-[#1f2937] border-b border-black flex justify-between items-center px-3 shrink-0">
+      <div class="flex flex-col">
+        <h2 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">KI-Input</h2>
+        <span class="text-[9px] text-blue-400 font-mono italic">index.html</span>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <button class="text-[10px] text-red-400 font-bold uppercase hover:text-red-300">Clear</button>
+        <select class="bg-gray-800 text-white text-[10px] rounded px-1 border border-gray-700 outline-none">
+          <option>🧠 Smart</option>
+          <option>⚡ Fast</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="flex-1 flex flex-col p-2 space-y-2">
+      <div class="flex items-center space-x-1 h-8 shrink-0">
+        <button onclick="triggerSmartSelect()" class="bg-gray-800 flex-1 h-full rounded text-[10px] font-bold text-blue-300 border border-gray-700 hover:bg-gray-700">{
+          ..
+        }</button>
+        <button class="bg-gray-800 flex-1 h-full rounded text-sm text-yellow-400 border border-gray-700 hover:bg-gray-700">⇄</button>
+        <button class="bg-gray-800 flex-1 h-full rounded text-xs border border-gray-700 hover:bg-gray-700">+ 📦</button>
+        <button class="bg-purple-600 px-3 h-full rounded text-xs font-bold uppercase shadow-lg">🚀</button>
+        <button class="bg-blue-600 px-3 h-full rounded text-[10px] font-bold uppercase">Merge</button>
+      </div>
+      <textarea class="w-full flex-1 bg-gray-950 border border-gray-700 rounded p-2 text-xs font-mono text-blue-100 outline-none focus:border-blue-500 resize-none" placeholder="KI Prompt hier eingeben..."></textarea>
+    </div>
+  </div>
 </div>
-            <div id="editorContainer" class="flex-1 relative bg-[#0d1117]"></div>
-
-        </div> <div class="w-[30%] flex flex-col bg-gray-900 shrink-0 border-l border-black">
-
-            <header class="h-12 bg-[#1f2937] border-b border-black flex justify-between items-center px-3 shrink-0">
-
-                <div class="flex flex-col">
-
-                    <h2 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">KI-Input</h2>
-
-                    <span class="text-[9px] text-blue-400 font-mono italic">index.html</span>
-
-                </div>
-
-                <div class="flex items-center space-x-2">
-
-                    <button class="text-[10px] text-red-400 font-bold uppercase hover:text-red-300">Clear</button>
-
-                    <select class="bg-gray-800 text-white text-[10px] rounded px-1 border border-gray-700 outline-none">
-
-                        <option>🧠 Smart</option>
-
-                        <option>⚡ Fast</option>
-
-                    </select>
-
-                </div>
-
-            </header>
-
-
-
-            <div class="flex-1 flex flex-col p-2 space-y-2">
-
-                <div class="flex items-center space-x-1 h-8 shrink-0">
-
-<button onclick="triggerSmartSelect()" class="bg-gray-800 flex-1 h-full rounded text-[10px] font-bold text-blue-300 border border-gray-700 hover:bg-gray-700">{..}</button>
-                    <button class="bg-gray-800 flex-1 h-full rounded text-sm text-yellow-400 border border-gray-700 hover:bg-gray-700">⇄</button>
-
-                    <button class="bg-gray-800 flex-1 h-full rounded text-xs border border-gray-700 hover:bg-gray-700">+ 📦</button>
-
-                    <button class="bg-purple-600 px-3 h-full rounded text-xs font-bold uppercase shadow-lg">🚀</button>
-
-                    <button class="bg-blue-600 px-3 h-full rounded text-[10px] font-bold uppercase">Merge</button>
-
-                </div>
-
-                <textarea class="w-full flex-1 bg-gray-950 border border-gray-700 rounded p-2 text-xs font-mono text-blue-100 outline-none focus:border-blue-500 resize-none" placeholder="KI Prompt hier eingeben..."></textarea>
-
-            </div>
-
-        </div>
-
-
-
-    </div>
-
-
-
 <script>
-    let editor;
-    let isTop = true;
-let currentMatchIndex = -1; // Neu: Aktueller Treffer
-    let currentMatches = [];    // Neu: Liste der Treffer
-let searchTimeout; // Timer für das automatische Speichern
-    let searchHistory = JSON.parse(localStorage.getItem('edgar_search_history') || '["index", "container", "main"]');
-let functionSearchActive = false;
+  let editor;
+  let isTop = true;
+  let currentMatchIndex = -1;
 
+  // Neu: Aktueller Treffer
+  let currentMatches = [];
 
-    // 1. MONACO INITIALISIERUNG
-    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }});
-    require(['vs/editor/editor.main'], function() {
-        editor = monaco.editor.create(document.getElementById('editorContainer'), {
-            value: "<!DOCTYPE html>\n<html lang=\"de\">\n<head>\n    <meta charset=\"UTF-8\">\n    <style>\n        body { background: #0d1117; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: sans-serif; }\n    </style>\n</head>\n<body>\n    <h1>Willkommen bei EdgAr IDE</h1>\n</body>\n</html>",
-            language: 'html',
-            theme: 'vs-dark',
-            fontSize: 13,
-            minimap: { enabled: false },
-            padding: { top: 16 },
-            automaticLayout: true 
-        });
+  // Neu: Liste der Treffer
+  let searchTimeout;
 
-        // --- WICHTIG: KLICK-LOGIK INNERHALB DER INITIALISIERUNG ---
-        editor.onMouseDown(function (e) {
-            if (e.event.ctrlKey || e.event.metaKey) {
-                // Verhindert das Standard-Verhalten
-                e.event.preventDefault();
-                // Setzt den Cursor an die geklickte Stelle, bevor markiert wird
-                const position = e.target.position;
-                if (position) {
-                    editor.setPosition(position);
-                    triggerSmartSelect();
-                }
-            }
-        });
+  // Timer für das automatische Speichern
+  let searchHistory = JSON.parse(localStorage.getItem('edgar_search_history') || '["index", "container", "main"]');
+  let functionSearchActive = false;
+  let navStates = {
+    top: true,
+    html: true,
+    style: true,
+    script: true
+  };
 
-        window.addEventListener('resize', () => editor.layout());
+  // 1. MONACO INITIALISIERUNG
+  require.config({
+    paths: {
+      'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs'
+    }
+
+  });
+  require(['vs/editor/editor.main'], function() {
+    editor = monaco.editor.create(document.getElementById('editorContainer'), {
+      value: "<!DOCTYPE html>\n<html lang=\"de\">\n<head>\n    <meta charset=\"UTF-8\">\n    <style>\n        body {
+        background: #0d1117;
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        font-family: sans-serif;
+      }\n    </style>\n</head>\n<body>\n    <h1>Willkommen bei EdgAr IDE</h1>\n</body>\n</html>",
+      language: 'html',
+      theme: 'vs-dark',
+      fontSize: 13,
+      minimap: {
+        enabled: false
+      },
+      padding: {
+        top: 16
+      },
+      automaticLayout: true
     });
 
-    // 2. SIDEBAR LOGIK
-    function toggleSidebar() {
-        const sidebar = document.getElementById('sidebar');
-        sidebar.classList.toggle('open');
-        let startTime = null;
-        function animate(timestamp) {
-            if (!startTime) startTime = timestamp;
-            if (editor) editor.layout();
-            if (timestamp - startTime < 250) requestAnimationFrame(animate);
-        }
-        requestAnimationFrame(animate);
-    }
+    // --- WICHTIG: KLICK-LOGIK INNERHALB DER INITIALISIERUNG ---
+    editor.onMouseDown(function (e) {
 
-    // 3. DATEI-OPERATIONEN & RUN
-    function createNewFile() {
-        if (confirm("Neue Datei erstellen? Ungespeicherte Änderungen gehen verloren.")) {
-            editor.setValue("<!DOCTYPE html>\n<html>\n<head>\n <title>Neue Datei</title>\n</head>\n<body>\n\n</body>\n</html>");
-        }
-    }
+      // NEU: Sidebar schließen, wenn sie offen ist
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar.classList.contains('open')) {
+        toggleSidebar();
+      }
 
-    async function openLocalFile() {
-        try {
-            const [fileHandle] = await window.showOpenFilePicker({
-                types: [{ description: 'Web Files', accept: {'text/html': ['.html'], 'text/css': ['.css'], 'text/javascript': ['.js']} }]
-            });
-            const file = await fileHandle.getFile();
-            editor.setValue(await file.text());
-        } catch (err) { console.log("Abgebrochen"); }
-    }
-
-    async function saveFileAs() {
-        try {
-            const handle = await window.showSaveFilePicker({
-                suggestedName: 'index.html',
-                types: [{ description: 'HTML Files', accept: {'text/html': ['.html']} }],
-            });
-            const writable = await handle.createWritable();
-            await writable.write(editor.getValue());
-            await writable.close();
-            showToast("Gespeichert!", "blue");
-        } catch (err) { console.error(err); }
-    }
-
-    function runCode() {
-        if (!editor) return;
-        const overlay = document.getElementById('previewOverlay');
-        const iframe = document.getElementById('previewFrame');
-        overlay.classList.remove('hidden');
-        overlay.classList.add('flex');
-        const doc = iframe.contentDocument || iframe.contentWindow.document;
-        doc.open();
-        doc.write(editor.getValue());
-        doc.close();
-    }
-
-    function closePreview() {
-        const overlay = document.getElementById('previewOverlay');
-        overlay.classList.replace('flex', 'hidden');
-        document.getElementById('previewFrame').src = "about:blank";
-    }
-
-    // 4. NAVIGATION
-    function jumpToSection(type) {
-        if (!editor) return;
-        const model = editor.getModel();
-        const content = model.getValue();
-        let lineToJump = 1;
-        let label = type.toUpperCase();
-
-        if (type === 'top') {
-            lineToJump = isTop ? 1 : model.getLineCount();
-            label = isTop ? "TOP" : "END";
-            isTop = !isTop; 
-        } else if (type === 'html') {
-            const match = content.match(/<body/i);
-            lineToJump = match ? model.getPositionAt(match.index).lineNumber : 1;
-            label = "BODY";
-        } else if (type === 'style') {
-            const match = content.match(/<style/i);
-            lineToJump = match ? model.getPositionAt(match.index).lineNumber : 1;
-        } else if (type === 'script') {
-            const match = content.match(/<script/i);
-            lineToJump = match ? model.getPositionAt(match.index).lineNumber : 1;
+      // Bestehende Smart-Select Logik (Strg + Klick)
+      if (e.event.ctrlKey || e.event.metaKey) {
+        e.event.preventDefault();
+        const position = e.target.position;
+        if (position) {
+          editor.setPosition(position);
+          triggerSmartSelect();
         }
 
-        editor.revealLineInCenter(lineToJump);
-        editor.setPosition({ lineNumber: lineToJump, column: 1 });
-        editor.focus();
-        showToast(`Sprung zu ${label}`, "blue");
-    }
+      }
 
-    function jumpToLine() {
-        const input = document.getElementById('lineInput');
-        const line = parseInt(input.value);
-        if (!editor || isNaN(line)) return;
-        const maxLines = editor.getModel().getLineCount();
-        if (line > 0 && line <= maxLines) {
-            editor.revealLineInCenter(line);
-            editor.setPosition({ lineNumber: line, column: 1 });
-            editor.focus();
-            input.value = "";
-        } else {
-            showToast(`Zeile ${line} existiert nicht`, "red");
-        }
-    }
-
-    // 5. SMART SELECT & ERWEITERTE SUCHE
-    function triggerSmartSelect() {
-        if (!editor) return;
-        const position = editor.getPosition();
-        const model = editor.getModel();
-        const lineCount = model.getLineCount();
-        let startLine = position.lineNumber;
-        let endLine = position.lineNumber;
-
-        for (let i = position.lineNumber; i >= 1; i--) {
-            if (model.getLineContent(i).trim() === "" && i !== position.lineNumber) {
-                startLine = i + 1; break;
-            }
-            if (i === 1) startLine = 1;
-        }
-        for (let i = position.lineNumber; i <= lineCount; i++) {
-            if (model.getLineContent(i).trim() === "" && i !== position.lineNumber) {
-                endLine = i - 1; break;
-            }
-            if (i === lineCount) endLine = lineCount;
-        }
-
-        editor.setSelection({
-            startLineNumber: startLine, startColumn: 1,
-            endLineNumber: endLine, endColumn: model.getLineMaxColumn(endLine)
-        });
-        showToast(`Block markiert`, "blue");
-    }
-
-    
-
-    function updateSearchDisplay() {
-        const badge = document.getElementById('searchCount');
-        if (currentMatches.length > 0) {
-            badge.innerText = `${currentMatchIndex + 1}/${currentMatches.length}`;
-            badge.style.color = "#60a5fa";
-            
-            const match = currentMatches[currentMatchIndex];
-            editor.revealRangeInCenter(match.range);
-            editor.setSelection(match.range);
-        }
-    }
-
-    function navigateSearch(direction) {
-        if (currentMatches.length === 0) return;
-        if (direction === 'next') {
-            currentMatchIndex = (currentMatchIndex + 1) % currentMatches.length;
-        } else {
-            currentMatchIndex = (currentMatchIndex - 1 + currentMatches.length) % currentMatches.length;
-        }
-        updateSearchDisplay();
-    }
-
-    function clearSearch() {
-        const input = document.getElementById('searchInput');
-        input.value = "";
-        handleSearchInput({ target: input });
-        editor.focus();
-    }
-
-    // Event-Listener beim Laden binden
-    document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('searchInput').addEventListener('input', handleSearchInput);
-        
-        document.getElementById('lineInput').addEventListener('keydown', (e) => {
-            if (e.key === "Enter") jumpToLine();
-        });
-        
-        renderHistory();
     });
+    window.addEventListener('resize', () => editor.layout());
+  });
 
+  // 2. SIDEBAR LOGIK
 
+  function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('open');
+    let startTime = null;
 
-function handleSearchInput(e) {
+    function animate(timestamp) {
+      if (!startTime) startTime = timestamp;
+      if (editor) editor.layout();
+      if (timestamp - startTime < 250) requestAnimationFrame(animate);
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  // 3. DATEI-OPERATIONEN & RUN
+
+  function createNewFile() {
+    if (confirm("Neue Datei erstellen? Ungespeicherte Änderungen gehen verloren.")) {
+      editor.setValue("<!DOCTYPE html>\n<html>\n<head>\n <title>Neue Datei</title>\n</head>\n<body>\n\n</body>\n</html>");
+    }
+
+  }
+
+  async function openLocalFile() {
+    try {
+      const [fileHandle] = await window.showOpenFilePicker({
+        types: [{
+          description: 'Web Files', accept: {
+            'text/html': ['.html'], 'text/css': ['.css'], 'text/javascript': ['.js']
+          }
+
+        }]
+      });
+      const file = await fileHandle.getFile();
+      editor.setValue(await file.text());
+    } catch (err) {
+      console.log("Abgebrochen");
+    }
+
+  }
+
+  async function saveFileAs() {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: 'index.html',
+        types: [{
+          description: 'HTML Files', accept: {
+            'text/html': ['.html']
+          }
+
+        }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(editor.getValue());
+      await writable.close();
+      showToast("Gespeichert!", "blue");
+    } catch (err) {
+      console.error(err);
+    }
+
+  }
+
+  function runCode() {
+    if (!editor) return;
+    const overlay = document.getElementById('previewOverlay');
+    const iframe = document.getElementById('previewFrame');
+    overlay.classList.remove('hidden');
+    overlay.classList.add('flex');
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    doc.write(editor.getValue());
+    doc.close();
+  }
+
+  function closePreview() {
+    const overlay = document.getElementById('previewOverlay');
+    overlay.classList.replace('flex', 'hidden');
+    document.getElementById('previewFrame').src = "about:blank";
+  }
+
+  // 4. NAVIGATION
+
+  function jumpToSection(type) {
+    if (!editor) return;
+    const model = editor.getModel();
+    const content = model.getValue();
+    let startLine = 1;
+    let endLine = model.getLineCount();
+
+    // Positionen finden
+    if (type === 'html') {
+      const matchStart = content.match(/<body/i);
+      const matchEnd = content.match(/<\/body>/i);
+      startLine = matchStart ? model.getPositionAt(matchStart.index).lineNumber : 1;
+      endLine = matchEnd ? model.getPositionAt(matchEnd.index).lineNumber : startLine;
+    } else if (type === 'style') {
+      const matchStart = content.match(/<style/i);
+      const matchEnd = content.match(/<\/style>/i);
+      startLine = matchStart ? model.getPositionAt(matchStart.index).lineNumber : 1;
+      endLine = matchEnd ? model.getPositionAt(matchEnd.index).lineNumber : startLine;
+    } else if (type === 'script') {
+      const matchStart = content.match(/<script/i);
+      const matchEnd = content.match(/<\/script>/i);
+      startLine = matchStart ? model.getPositionAt(matchStart.index).lineNumber : 1;
+      endLine = matchEnd ? model.getPositionAt(matchEnd.index).lineNumber : startLine;
+    }
+
+    // Toggle-Logik
+    const targetLine = navStates[type] ? startLine : endLine;
+    navStates[type] = !navStates[type];
+
+    // Status für nächsten Klick umkehren
+    editor.revealLineInCenter(targetLine);
+    editor.setPosition({
+      lineNumber: targetLine, column: 1
+    });
+    editor.focus();
+    showToast(`Sprung zu ${
+      type.toUpperCase()
+    } ${
+      !navStates[type] ? 'START' : 'ENDE'
+    }`, "blue");
+  }
+
+  function selectSection(type) {
+    if (!editor) return;
+    const model = editor.getModel();
+    const content = model.getValue();
+    let startPos, endPos;
+    if (type === 'top') {
+      startPos = {
+        lineNumber: 1, column: 1
+      };
+      endPos = {
+        lineNumber: model.getLineCount(), column: model.getLineMaxColumn(model.getLineCount())
+      };
+    } else {
+      const startRegex = new RegExp(`<${
+        type
+      }`, 'i');
+      const endRegex = new RegExp(`</${
+        type
+      }>`, 'i');
+      const matchStart = content.match(startRegex);
+      const matchEnd = content.match(endRegex);
+      if (matchStart && matchEnd) {
+        const startCoords = model.getPositionAt(matchStart.index);
+        const endCoords = model.getPositionAt(matchEnd.index + matchEnd[0].length);
+        startPos = {
+          lineNumber: startCoords.lineNumber, column: 1
+        };
+        endPos = {
+          lineNumber: endCoords.lineNumber, column: model.getLineMaxColumn(endCoords.lineNumber)
+        };
+      }
+
+    }
+
+    if (startPos && endPos) {
+      editor.setSelection({
+        startLineNumber: startPos.lineNumber, startColumn: startPos.column,
+        endLineNumber: endPos.lineNumber, endColumn: endPos.column
+      });
+      showToast(`${
+        type.toUpperCase()
+      } markiert`, "blue");
+    }
+
+  }
+
+  function jumpToLine() {
+    const input = document.getElementById('lineInput');
+    const line = parseInt(input.value);
+    if (!editor || isNaN(line)) return;
+    const maxLines = editor.getModel().getLineCount();
+    if (line > 0 && line <= maxLines) {
+      editor.revealLineInCenter(line);
+      editor.setPosition({
+        lineNumber: line, column: 1
+      });
+      editor.focus();
+      input.value = "";
+    } else {
+      showToast(`Zeile ${
+        line
+      } existiert nicht`, "red");
+    }
+
+  }
+
+  // 5. SMART SELECT & ERWEITERTE SUCHE
+
+  function triggerSmartSelect() {
+    if (!editor) return;
+    const position = editor.getPosition();
+    const model = editor.getModel();
+    const lineCount = model.getLineCount();
+    let startLine = position.lineNumber;
+    let endLine = position.lineNumber;
+    for (let i = position.lineNumber;
+    i >= 1;
+    i--) {
+      if (model.getLineContent(i).trim() === "" && i !== position.lineNumber) {
+        startLine = i + 1;
+        break;
+      }
+
+      if (i === 1) startLine = 1;
+    }
+
+    for (let i = position.lineNumber;
+    i <= lineCount;
+    i++) {
+      if (model.getLineContent(i).trim() === "" && i !== position.lineNumber) {
+        endLine = i - 1;
+        break;
+      }
+
+      if (i === lineCount) endLine = lineCount;
+    }
+
+    editor.setSelection({
+      startLineNumber: startLine, startColumn: 1,
+      endLineNumber: endLine, endColumn: model.getLineMaxColumn(endLine)
+    });
+    showToast(`Block markiert`, "blue");
+  }
+
+  function updateSearchDisplay() {
+    const badge = document.getElementById('searchCount');
+    if (currentMatches.length > 0) {
+      badge.innerText = `${
+        currentMatchIndex + 1
+      }/${
+        currentMatches.length
+      }`;
+      badge.style.color = "#60a5fa";
+      const match = currentMatches[currentMatchIndex];
+      editor.revealRangeInCenter(match.range);
+      editor.setSelection(match.range);
+    }
+
+  }
+
+  function navigateSearch(direction) {
+    if (currentMatches.length === 0) return;
+    if (direction === 'next') {
+      currentMatchIndex = (currentMatchIndex + 1) % currentMatches.length;
+    } else {
+      currentMatchIndex = (currentMatchIndex - 1 + currentMatches.length) % currentMatches.length;
+    }
+
+    updateSearchDisplay();
+  }
+
+  function clearSearch() {
+    const input = document.getElementById('searchInput');
+    input.value = "";
+    handleSearchInput({
+      target: input
+    });
+    editor.focus();
+  }
+
+  // Event-Listener beim Laden binden
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('searchInput').addEventListener('input', handleSearchInput);
+    document.getElementById('lineInput').addEventListener('keydown', (e) => {
+      if (e.key === "Enter") jumpToLine();
+    });
+    renderHistory();
+  });
+
+  function handleSearchInput(e) {
     const term = e.target.value.trim();
     const badge = document.getElementById('searchCount');
-    
     if (!editor || !term) {
-        badge.innerText = "0/0";
-        badge.style.color = "";
-        currentMatches = [];
-        currentMatchIndex = -1;
-        return;
+      badge.innerText = "0/0";
+      badge.style.color = "";
+      currentMatches = [];
+      currentMatchIndex = -1;
+      return;
     }
 
     const model = editor.getModel();
-    
+
     // --- FUNKTIONS-FILTER LOGIK ---
     if (functionSearchActive) {
-        // Findet 'function' gefolgt von deinem Suchbegriff (case-insensitive)
-        const regexTerm = `function\\s+\\w*${term}\\w*`;
-        currentMatches = model.findMatches(regexTerm, true, true, false, null, true);
-    } else {
-        // Normale Suche wie bisher
-        currentMatches = model.findMatches(term, false, false, false, null, true);
-    }
-    
-    if (currentMatches.length > 0) {
-        currentMatchIndex = 0;
-        updateSearchDisplay();
-        
-        // Auto-History Logik (nur im normalen Modus, um die Liste sauber zu halten)
-        if (!functionSearchActive) {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                if (term.length > 2) {
-                    addToHistory(term);
-                }
-            }, 2000);
-        }
-    } else {
-        currentMatchIndex = -1;
-        badge.innerText = "0/0";
-        badge.style.color = "#ef4444";
-    }
-}
 
-function addToHistory(term) {
+      // Findet 'function' gefolgt von deinem Suchbegriff (case-insensitive)
+      const regexTerm = `function\\s+\\w*${
+        term
+      }\\w*`;
+      currentMatches = model.findMatches(regexTerm, true, true, false, null, true);
+    } else {
+
+      // Normale Suche wie bisher
+      currentMatches = model.findMatches(term, false, false, false, null, true);
+    }
+
+    if (currentMatches.length > 0) {
+      currentMatchIndex = 0;
+      updateSearchDisplay();
+
+      // Auto-History Logik (nur im normalen Modus, um die Liste sauber zu halten)
+      if (!functionSearchActive) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          if (term.length > 2) {
+            addToHistory(term);
+          }
+
+        }, 2000);
+      }
+
+    } else {
+      currentMatchIndex = -1;
+      badge.innerText = "0/0";
+      badge.style.color = "#ef4444";
+    }
+
+  }
+
+  function addToHistory(term) {
+
     // Prüfen, ob der Begriff schon existiert
     if (!searchHistory.includes(term)) {
-        searchHistory.unshift(term); // Vorne hinzufügen
-        if (searchHistory.length > 5) searchHistory.pop(); // Max 8 Einträge
-        
-        // LocalStorage aktualisieren
-        localStorage.setItem('edgar_search_history', JSON.stringify(searchHistory));
-        renderHistory();
-        showToast(`"${term}" zur Historie hinzugefügt`, "blue");
+      searchHistory.unshift(term);
+
+      // Vorne hinzufügen
+      if (searchHistory.length > 5) searchHistory.pop();
+
+      // Max 5 Einträge
+      // LocalStorage aktualisieren
+      localStorage.setItem('edgar_search_history', JSON.stringify(searchHistory));
+      renderHistory();
+      showToast(`"${
+        term
+      }" zur Historie hinzugefügt`, "blue");
     }
+
+  }
+
+  // 6. ERWEITERUNGEN (TOASTS & HISTORY)
+
+  function showToast(message, type = "blue") {
+    const toast = document.createElement('div');
+    const colorClass = type === "red" ? "bg-red-600" : "bg-blue-600";
+    toast.className = `fixed top-4 right-4 ${
+      colorClass
+    } text-white px-4 py-2 rounded shadow-lg z-[200] text-xs font-bold animate-pulse`;
+    toast.innerText = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
+  }
+
+  function renderHistory() {
+    const container = document.getElementById('searchHistory');
+    if (!container) return;
+    container.innerHTML = searchHistory.map(term => `
+    <span onclick="applyHistoryTerm('${
+      term
+    }')" class="search-tag hover:bg-blue-500 hover:text-white transition-colors">
+    ${
+      term
+    }
+
+  </span>
+  `).join('');
 }
 
+function applyHistoryTerm(term) {
+  const input = document.getElementById('searchInput');
 
-    // 6. ERWEITERUNGEN (TOASTS & HISTORY)
-    function showToast(message, type = "blue") {
-        const toast = document.createElement('div');
-        const colorClass = type === "red" ? "bg-red-600" : "bg-blue-600";
-        toast.className = `fixed top-4 right-4 ${colorClass} text-white px-4 py-2 rounded shadow-lg z-[200] text-xs font-bold animate-pulse`;
-        toast.innerText = message;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 2500);
+  // Wenn der Begriff schon drin steht, springe zum nächsten Treffer
+  if (input.value === term && currentMatches.length > 0) {
+    navigateSearch('next');
+  } else {
+
+    // Ansonsten: Neue Suche starten
+    input.value = term;
+    handleSearchInput({
+      target: input
+    });
+    if (currentMatches.length > 0) {
+      currentMatchIndex = 0;
+      updateSearchDisplay();
     }
 
+  }
 
-    function renderHistory() {
-        const container = document.getElementById('searchHistory');
-        if (!container) return;
-        container.innerHTML = searchHistory.map(term => `
-            <span onclick="applyHistoryTerm('${term}')" class="search-tag hover:bg-blue-500 hover:text-white transition-colors">
-                ${term}
-            </span>
-        `).join('');
-    }
-
-    function applyHistoryTerm(term) {
-    const input = document.getElementById('searchInput');
-    
-    // Wenn der Begriff schon drin steht, springe zum nächsten Treffer
-    if (input.value === term && currentMatches.length > 0) {
-        navigateSearch('next');
-    } else {
-        // Ansonsten: Neue Suche starten
-        input.value = term;
-        handleSearchInput({ target: input });
-        if (currentMatches.length > 0) {
-            currentMatchIndex = 0;
-            updateSearchDisplay();
-        }
-    }
-    input.focus();
+  input.focus();
 }
 
-    function toggleFunctionSearch() {
-    functionSearchActive = !functionSearchActive;
-    const btn = event.currentTarget; // Holt den geklickten Button
-    
-    if (functionSearchActive) {
-        btn.classList.add('bg-blue-600', 'text-white');
-        btn.classList.remove('bg-gray-800', 'text-gray-400');
-        showToast("Funktions-Suche AKTIV", "blue");
-    } else {
-        btn.classList.remove('bg-blue-600', 'text-white');
-        btn.classList.add('bg-gray-800', 'text-gray-400');
-        showToast("Normaler Such-Modus", "blue");
-    }
-    
-    // Suche sofort mit neuem Modus triggern
-    const input = document.getElementById('searchInput');
-    handleSearchInput({ target: input });
+function toggleFunctionSearch() {
+
+  functionSearchActive = !functionSearchActive;
+  const btn = event.currentTarget;
+
+  // Holt den geklickten Button
+  if (functionSearchActive) {
+    btn.classList.add('bg-blue-600', 'text-white');
+    btn.classList.remove('bg-gray-800', 'text-gray-400');
+    showToast("Funktions-Suche AKTIV", "blue");
+  } else {
+    btn.classList.remove('bg-blue-600', 'text-white');
+    btn.classList.add('bg-gray-800', 'text-gray-400');
+    showToast("Normaler Such-Modus", "blue");
+  }
+
+  // Suche sofort mit neuem Modus triggern
+  const input = document.getElementById('searchInput');
+  handleSearchInput({
+    target: input
+  });
 }
 
+async function insertPrompt(text) {
+  const textarea = document.querySelector('textarea');
+  if (!textarea || !editor) return;
+
+  // 1. Markierten Code aus Monaco holen
+  const selection = editor.getSelection();
+  const model = editor.getModel();
+  const selectedCode = model.getValueInRange(selection);
+
+  // 2. Den kombinierten String erstellen
+  let fullText = text;
+  if (selectedCode) {
+    fullText = text + "\n\n" + selectedCode;
+  }
+
+  // 3. In das KI-Textfeld im Editor schreiben (Vorschau)
+  textarea.value = fullText;
+  textarea.focus();
+
+  // 4. In die ZWISCHENABLAGE kopieren
+  try {
+    await navigator.clipboard.writeText(fullText);
+    showToast("In Zwischenablage kopiert! 📋", "purple");
+  } catch (err) {
+    console.error('Kopieren fehlgeschlagen:', err);
+
+    // Fallback für ältere Browser oder unsichere Umgebungen
+    textarea.select();
+    document.execCommand('copy');
+    showToast("Manuell kopiert (Fallback)", "blue");
+  }
+
+}
+
+async function magicFix() {
+  if (!editor) return;
+  const model = editor.getModel();
+  const selection = editor.getSelection();
+  const textarea = document.querySelector('textarea');
+  let code = model.getValueInRange(selection) || model.getValue();
+
+  // 1. SCHRITT: Aggressive Reinigung
+  code = code.replace(/\n\s*\n+/g, '\n');
+
+  // 2. SCHRITT: CSS & JS Formatierung
+  code = code.replace(/{
+    \s*/g, '{
+      \n');
+      code = code.replace(/;
+      \s*/g, ';
+      \n');
+      code = code.replace(/\s*
+    }/g, '\n
+  }');
+
+  // 3. SCHRITT: Intelligente Leerzeilen (JS, CSS & HTML Sektionen)
+  let lines = code.split('\n');
+  let newLines = [];
+  for (let i = 0;
+  i < lines.length;
+  i++) {
+    let t = lines[i].trim();
+    if (i > 0) {
+      let prev = lines[i-1].trim();
+
+      // Regel A: JS Funktionen & Klassen
+      const isJSBlock = /^(async\s+function|function|class)/.test(t);
+
+      // Regel B: CSS Selektoren
+      const isCSSSelector = prev === "
+    }" && t !== "" && !t.startsWith('</style');
+
+    // Regel C: HTML Sektionen (Leerzeile vor Containern, wenn ein Block endete)
+    // Wir prüfen, ob die Zeile mit einem "Block-Tag" beginnt und die Vorzeile ein Ende-Tag war
+    const isHTMLSection = prev.endsWith('>') &&
+    prev.includes('</') &&
+    /^<(div|section|header|footer|aside|main|table|ul|ol|form)/i.test(t);
+
+    // Regel D: Sektions-Kommentare (Ganz links)
+    const isMainComment = lines[i].startsWith('//') || lines[i].startsWith('/*');
+    if (isJSBlock || isCSSSelector || isHTMLSection || isMainComment) {
+      if (newLines[newLines.length - 1] !== "") {
+        newLines.push("");
+      }
+
+    }
+
+  }
+
+  newLines.push(lines[i]);
+}
+
+code = newLines.join('\n');
+
+// 4. SCHRITT: Einrückung (2 Spaces)
+let indent = 0;
+const tabSize = 2;
+code = code.split('\n').map(line => {
+  let t = line.trim();
+  if (t === "") return "";
+  if (t.match(/^[
+  }\]\)]/) || t.match(/^<\//)) indent = Math.max(0, indent - 1);
+  const res = " ".repeat(indent * tabSize) + t;
+  const isVoid = /<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)/i.test(t);
+  const isInline = t.match(/^<([a-z0-9]+)[^>]*>.*<\/\1>$/i);
+
+  // <p>text</p> etc.
+  if (t.match(/[{
+    \[\(]$/) || (t.match(/^<[^\/!]+>$/) && !t.match(/\/>$/) && !isVoid && !isInline)) {
+      indent++;
+    }
+
+    return res;
+  }).join('\n');
+
+  // 5. SCHRITT: Finaler Trimm
+  code = code.trim().replace(/\n\n\n+/g, '\n\n');
+
+  // Anwenden
+  if (selection.isEmpty()) {
+    model.setValue(code);
+  } else {
+    editor.executeEdits("magic", [{
+      range: selection, text: code
+    }]);
+  }
+
+  if (textarea) textarea.value = "Struktur finalisiert:\n\n" + code;
+  navigator.clipboard.writeText(code);
+  showToast("HTML, CSS & JS perfekt strukturiert! 🪄", "purple");
+}
+
+// Sidebar schließen bei Klick außerhalb
+document.addEventListener('mousedown', function(event) {
+  const sidebar = document.getElementById('sidebar');
+  const menuBtn = event.target.closest('button');
+
+  // Prüfen, ob der Menü-Button selbst geklickt wurde
+  // Wenn die Sidebar offen ist UND der Klick NICHT innerhalb der Sidebar war
+  // UND NICHT auf den Menü-Button (sonst würde sie sofort wieder zugehen)
+  if (sidebar.classList.contains('open') &&
+  !sidebar.contains(event.target) &&
+  (!menuBtn || !menuBtn.innerText.includes('☰'))) {
+    toggleSidebar();
+  }
+
+});
 </script>
+
 <div id="previewOverlay" class="fixed inset-0 bg-black/90 z-[100] hidden flex-col p-4 md:p-8">
-
-    <div class="flex justify-between items-center mb-4 bg-[#1f2937] p-2 rounded-t-lg border-b border-black">
-
-        <span class="text-white text-xs font-bold px-2 uppercase tracking-widest">EdgAr Live Vorschau</span>
-
-        <button onclick="closePreview()" class="bg-red-600 hover:bg-red-500 text-white px-4 py-1 rounded text-xs font-bold transition">Schließen ×</button>
-
-    </div>
-
-    <div class="flex-1 bg-white rounded-b-lg overflow-hidden shadow-2xl">
-
-        <iframe id="previewFrame" class="w-full h-full border-none"></iframe>
-
-    </div>
-
+<div class="flex justify-between items-center mb-4 bg-[#1f2937] p-2 rounded-t-lg border-b border-black">
+  <span class="text-white text-xs font-bold px-2 uppercase tracking-widest">EdgAr Live Vorschau</span>
+  <button onclick="closePreview()" class="bg-red-600 hover:bg-red-500 text-white px-4 py-1 rounded text-xs font-bold transition">Schließen ×</button>
 </div>
 
+<div class="flex-1 bg-white rounded-b-lg overflow-hidden shadow-2xl">
+  <iframe id="previewFrame" class="w-full h-full border-none"></iframe>
+</div>
+</div>
 </body>
-
 </html>
