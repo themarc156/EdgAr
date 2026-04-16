@@ -253,8 +253,7 @@
         }</button>
         <button class="bg-gray-800 flex-1 h-full rounded text-sm text-yellow-400 border border-gray-700 hover:bg-gray-700">⇄</button>
         <button class="bg-gray-800 flex-1 h-full rounded text-xs border border-gray-700 hover:bg-gray-700">+ 📦</button>
-        <button class="bg-purple-600 px-3 h-full rounded text-xs font-bold uppercase shadow-lg">🚀</button>
-        <button class="bg-blue-600 px-3 h-full rounded text-[10px] font-bold uppercase">Merge</button>
+<button onclick="sendAI()" class="bg-purple-600 hover:bg-purple-500 active:scale-95 px-3 h-full rounded text-xs font-bold uppercase shadow-lg transition-all">🚀</button>        <button class="bg-blue-600 px-3 h-full rounded text-[10px] font-bold uppercase">Merge</button>
       </div>
       <textarea class="w-full flex-1 bg-gray-950 border border-gray-700 rounded p-2 text-xs font-mono text-blue-100 outline-none focus:border-blue-500 resize-none" placeholder="KI Prompt hier eingeben..."></textarea>
     </div>
@@ -272,7 +271,7 @@
   let searchTimeout;
 
   // Timer für das automatische Speichern
-  let searchHistory = JSON.parse(localStorage.getItem('edgar_search_history') || '["index", "container", "main"]');
+let searchHistory = JSON.parse(localStorage.getItem('edgar_search_history') || '[]');
   let functionSearchActive = false;
   let navStates = {
     top: true,
@@ -456,17 +455,26 @@ editor.onMouseDown(function (e) {
 
   }
 
-  function runCode() {
+function runCode() {
     if (!editor) return;
     const overlay = document.getElementById('previewOverlay');
     const iframe = document.getElementById('previewFrame');
+    
     overlay.classList.remove('hidden');
     overlay.classList.add('flex');
+    
     const doc = iframe.contentDocument || iframe.contentWindow.document;
+    const userCode = editor.getValue();
+
     doc.open();
-    doc.write(editor.getValue());
+    // Wir fügen das Tailwind-Skript automatisch hinzu, falls die KI es vergisst
+    if (userCode.includes('tailwindcss') || userCode.includes('class=')) {
+doc.write('<script src="https://cdn.tailwindcss.com"><\/script>');    }
+    doc.write(userCode);
     doc.close();
-  }
+    
+    showToast("Vorschau aktualisiert!", "blue");
+}
 
   function closePreview() {
     const overlay = document.getElementById('previewOverlay');
@@ -845,29 +853,114 @@ async function insertPrompt(text) {
 
 }
 
+// 1. Kontext-Halter für Monaco (angepasst an dein Modell)
+function getMonacoContext() {
+    if (!editor) return { html: "", css: "", js: "", activeTab: "html" };
+    
+    // Da du aktuell alles in einer Datei (index.html) hast:
+    return {
+        html: editor.getValue(),
+        css: "", // Falls du später Tabs einbaust, hier erweitern
+        js: "",
+        activeTab: "index.html"
+    };
+}
+
+async function sendAI() {
+    if (!editor) return;
+
+    const aiInputEl = document.querySelector('textarea.flex-1'); 
+    const promptText = aiInputEl.value.trim();
+    
+    if (!promptText) {
+        showToast("Bitte gib einen Prompt ein!", "red");
+        return;
+    }
+
+    const currentCode = editor.getValue();
+    showToast("EdgAr KI analysiert...", "blue");
+
+    const fullPrompt = `AKTUELLER CODE:\n${currentCode}\n\nAUFGABE:\n${promptText}\n\nRegel: Nur Code ausgeben.`;
+
+    try {
+        const res = await fetch("https://edgaride.vercel.app/api/ai", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: fullPrompt })
+        });
+
+        if (!res.ok) throw new Error("API-Fehler");
+
+        const data = await res.json();
+        let aiCode = data.choices[0].message.content;
+
+        // Bereinigung
+        aiCode = aiCode.replace(/```[a-z]*\n/gi, '').replace(/```/g, '').trim();
+
+        aiInputEl.value = aiCode;
+        
+        // Code in Monaco einfügen
+        editor.executeEdits("ai-update", [{ 
+            range: editor.getModel().getFullModelRange(), 
+            text: aiCode 
+        }]);
+
+        showToast("Code aktualisiert! 🚀", "purple");
+
+        setTimeout(() => {
+            if (typeof runCode === "function") runCode(); 
+        }, 300);
+
+    } catch (err) {
+        console.error(err);
+        showToast("KI Fehler - siehe Konsole", "red");
+    }
+}
+
+
+window.addEventListener('message', (event) => {
+    if (event.data.type === 'iframeError') {
+        const line = event.data.line - 1;
+        // Monaco Marker setzen
+        monaco.editor.setModelMarkers(window.editorModels.js, "owner", [{
+            startLineNumber: line,
+            endLineNumber: line,
+            message: event.data.msg,
+            severity: monaco.MarkerSeverity.Error
+        }]);
+        showToast(`Fehler in Zeile ${line}: ${event.data.msg}`, "red");
+    }
+});
+
 async function magicFix() {
   if (!editor) return;
   const model = editor.getModel();
   const selections = editor.getSelections(); 
   const textarea = document.querySelector('textarea');
 
-  // Fall A: Nichts markiert -> Alles
+  // Fall A: Nichts markiert -> Die ganze Datei optimieren
   if (selections.length === 1 && selections[0].isEmpty()) {
     const fullCode = model.getValue();
     const fixed = applyMagicLogic(fullCode);
     model.setValue(fixed);
     if (textarea) textarea.value = "Datei optimiert:\n\n" + fixed;
   } 
-  // Fall B: Mehrfach-Auswahl
+  // Fall B: Mehrfach-Auswahl (z.B. Strg+Klick auf mehrere Funktionen)
   else {
-    const edits = selections.map(sel => {
+    // WICHTIG: Wir sortieren die Bereiche von UNTEN nach OBEN.
+    // So verschieben Änderungen im oberen Bereich nicht die Positionen der unteren.
+    const sortedSelections = [...selections].sort((a, b) => b.startLineNumber - a.startLineNumber);
+
+    const edits = sortedSelections.map(sel => {
       const originalText = model.getValueInRange(sel);
       return {
         range: sel,
         text: applyMagicLogic(originalText),
-        forceMoveMarkers: true
+        forceMoveMarkers: false // Marker sollen nicht wild springen
       };
     });
+
+    // Alle Änderungen in einem Rutsch (Undo-Stack freundlich) ausführen
     editor.executeEdits("magic-multi", edits);
   }
   showToast("Struktur perfektioniert! 🪄", "purple");
@@ -876,13 +969,11 @@ async function magicFix() {
 function applyMagicLogic(code) {
   if (!code) return "";
   
-  // 1. Grundreinigung & CSS/JS Umbrüche
+  // 1. Grundreinigung (Strings statt Regex, um "missing /" zu vermeiden)
   let formatted = code
-    .replace(/\r\n/g, '\n')
-    .replace(/\n\s*\n+/g, '\n')           // Keine Stapel
-    .replace(/{\s*/g, '{\n')              // Umbruch nach {
-    .replace(/;\s*/g, ';\n')              // Umbruch nach ;
-    .replace(/\s*}/g, '\n}');             // Umbruch vor }
+    .split('\r\n').join('\n')
+    .split('{\s*').join('{\n')
+    .split(';\s*').join(';\n');
 
   // 2. Intelligente Leerzeilen
   let lines = formatted.split('\n');
@@ -892,12 +983,12 @@ function applyMagicLogic(code) {
     if (i > 0) {
       let prev = lines[i - 1].trim();
       
-      const isJSBlock = /^(async\s+function|function|class|const\s+\w+\s*=\s*async\s*\()/.test(t);
-      const isCSSSelector = prev === "}" && t !== "" && !t.startsWith('</style');
-      const isHTMLSection = prev.endsWith('>') && prev.includes('</') && /^<(div|section|header|footer|aside|main|table|ul|ol|form)/i.test(t);
-      const isMainComment = lines[i].startsWith('//') || lines[i].startsWith('/*');
+      // Prüfungen ohne komplexe Regex
+      const isJS = t.startsWith('function') || t.startsWith('async') || t.startsWith('class');
+      const isCSS = prev === "}" && t !== "" && !t.startsWith('</');
+      const isHTML = prev.endsWith('>') && (t.startsWith('<div') || t.startsWith('<section') || t.startsWith('<table'));
 
-      if (isJSBlock || isCSSSelector || isHTMLSection || isMainComment) {
+      if (isJS || isCSS || isHTML) {
         if (newLines.length > 0 && newLines[newLines.length - 1] !== "") {
           newLines.push("");
         }
@@ -906,24 +997,35 @@ function applyMagicLogic(code) {
     newLines.push(lines[i]);
   }
 
-  // 3. Einrückung (2 Spaces)
+  // 3. Präzise Einrückung
   let indent = 0;
-  const tabSize = 2;
   return newLines.map(line => {
     let t = line.trim();
     if (t === "") return "";
-    
-    if (t.match(/^[}\]\)]/) || t.match(/^<\//)) indent = Math.max(0, indent - 1);
-    const res = " ".repeat(indent * tabSize) + t;
-    
-    const isVoid = /<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)/i.test(t);
-    const isInline = t.match(/^<([a-z0-9]+)[^>]*>.*<\/\1>$/i);
-    
-    if (t.match(/[{\[\(]$/) || (t.match(/^<[^\/!]+>$/) && !t.match(/\/>$/) && !isVoid && !isInline)) {
+
+    let low = t.toLowerCase();
+    // Reset bei Sektionen
+    if (low.startsWith('<html') || low.startsWith('<body') || low.startsWith('<head') || low.startsWith('<style') || low.startsWith('<script')) {
+      indent = 0;
+    }
+
+    // RAUSRÜCKEN (Check auf erste Zeichen)
+    if (t.startsWith('}') || t.startsWith(']') || t.startsWith(')') || t.startsWith('</')) {
+      indent = Math.max(0, indent - 1);
+    }
+
+    const res = " ".repeat(indent * 2) + t;
+
+    // EINRÜCKEN (Check auf letzte Zeichen)
+    const opensBrace = t.endsWith('{') || t.endsWith('[') || t.endsWith('(');
+    const opensTag = t.startsWith('<') && !t.startsWith('</') && !t.endsWith('/>') && !t.includes('</') && !t.startsWith('<!');
+
+    if (opensBrace || opensTag) {
       indent++;
     }
+
     return res;
-  }).join('\n').trim().replace(/\n\n\n+/g, '\n\n');
+  }).join('\n').trim();
 }
 
 // Sidebar schließen bei Klick außerhalb
