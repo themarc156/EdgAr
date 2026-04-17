@@ -108,6 +108,26 @@
         border-radius: 4px;
         border: 3px solid #0d1117;
       }
+
+/* Grundstil für die Modell-Buttons */
+.model-btn {
+    color: #64748b; /* Graublau für inaktive */
+    cursor: pointer;
+}
+
+/* Stil für den jeweils gewählten Modus */
+.model-btn.active-model {
+    background: #1e293b !important; /* Dunkler Hintergrund */
+    color: #60a5fa !important;    /* Leuchtendes Blau */
+    box-shadow: 0 0 8px rgba(96, 165, 250, 0.2);
+    border-radius: 4px;
+}
+
+      .model-btn.active-model {
+  background: #1e293b; /* Dunkles Blau-Grau */
+  color: #60a5fa !important; /* Helles Blau für den aktiven Text */
+  box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+}
     </style>
   </head>
   <body>
@@ -234,27 +254,31 @@
     <header class="h-12 bg-[#1f2937] border-b border-black flex justify-between items-center px-3 shrink-0">
       <div class="flex flex-col">
         <h2 class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">KI-Input</h2>
-        <span class="text-[9px] text-blue-400 font-mono italic">index.html</span>
+        <span class="text-[9px] text-blue-400 font-mono italic"></span>
       </div>
 
       <div class="flex items-center space-x-2">
-        <button class="text-[10px] text-red-400 font-bold uppercase hover:text-red-300">Clear</button>
-        <select class="bg-gray-800 text-white text-[10px] rounded px-1 border border-gray-700 outline-none">
-          <option>🧠 Smart</option>
-          <option>⚡ Fast</option>
-        </select>
-      </div>
+  <button onclick="document.querySelector('textarea.flex-1').value = ''; showToast('Eingabe geleert', 'blue');" class="text-[10px] text-red-400 font-bold uppercase hover:text-red-300">
+    Clear
+  </button>
+</div>
     </header>
 
     <div class="flex-1 flex flex-col p-2 space-y-2">
-      <div class="flex items-center space-x-1 h-8 shrink-0">
-        <button onclick="triggerSmartSelect()" class="bg-gray-800 flex-1 h-full rounded text-[10px] font-bold text-blue-300 border border-gray-700 hover:bg-gray-700">{
-          ..
-        }</button>
-        <button class="bg-gray-800 flex-1 h-full rounded text-sm text-yellow-400 border border-gray-700 hover:bg-gray-700">⇄</button>
-        <button class="bg-gray-800 flex-1 h-full rounded text-xs border border-gray-700 hover:bg-gray-700">+ 📦</button>
-<button onclick="sendAI()" class="bg-purple-600 hover:bg-purple-500 active:scale-95 px-3 h-full rounded text-xs font-bold uppercase shadow-lg transition-all">🚀</button>        <button class="bg-blue-600 px-3 h-full rounded text-[10px] font-bold uppercase">Merge</button>
-      </div>
+      <div class="flex items-center space-x-1 h-8 shrink-0 bg-gray-900 p-1 rounded-lg border border-gray-800">
+  <button onclick="undoAI()" class="hover:bg-gray-800 px-2 h-full rounded text-xs">⏪</button>
+  <button onclick="redoAI()" class="hover:bg-gray-800 px-2 h-full rounded text-xs">⏩</button>
+
+  <div class="flex bg-black/30 rounded p-0.5 mx-1 border border-gray-800">
+    <button onclick="setModel('smart')" id="btn-smart" class="model-btn active-model px-2 py-1 text-[9px] font-bold uppercase transition-all">Smart</button>
+    <button onclick="setModel('fast')" id="btn-fast" class="model-btn px-2 py-1 text-[9px] font-bold uppercase transition-all">Fast</button>
+    <button onclick="setModel('cheap')" id="btn-cheap" class="model-btn px-2 py-1 text-[9px] font-bold uppercase transition-all">Cheap</button>
+  </div>
+
+  <button onclick="sendAI()" class="bg-purple-600 hover:bg-purple-500 active:scale-95 flex-1 h-full rounded text-xs font-bold transition-all shadow-lg">
+    🚀
+  </button>
+</div>
       <textarea class="w-full flex-1 bg-gray-950 border border-gray-700 rounded p-2 text-xs font-mono text-blue-100 outline-none focus:border-blue-500 resize-none" placeholder="KI Prompt hier eingeben..."></textarea>
     </div>
   </div>
@@ -269,6 +293,11 @@
 
   // Neu: Liste der Treffer
   let searchTimeout;
+
+let codeHistory = []; 
+let redoStack = []; // Das Gedächtnis für die Wiederholung
+
+let currentModel = 'smart'; // Standard-Einstellung
 
   // Timer für das automatische Speichern
 let searchHistory = JSON.parse(localStorage.getItem('edgar_search_history') || '[]');
@@ -819,6 +848,25 @@ function toggleFunctionSearch() {
   });
 }
 
+function setModel(model) {
+    currentModel = model;
+    
+    // 1. Alle Modell-Buttons finden
+    const buttons = document.querySelectorAll('.model-btn');
+    
+    // 2. Bei allen die "Aktiv"-Klasse entfernen
+    buttons.forEach(btn => btn.classList.remove('active-model'));
+    
+    // 3. Nur dem geklickten Button die "Aktiv"-Klasse geben
+    const activeBtn = document.getElementById('btn-' + model);
+    if (activeBtn) {
+        activeBtn.classList.add('active-model');
+    }
+    
+    // Kleines Feedback für dich
+    showToast("Modus: " + model.toUpperCase(), "blue");
+}
+
 async function insertPrompt(text) {
   const textarea = document.querySelector('textarea');
   if (!textarea || !editor) return;
@@ -878,7 +926,9 @@ async function sendAI() {
     }
 
     const currentCode = editor.getValue();
-    showToast("EdgAr KI analysiert...", "blue");
+    
+    // --- NEU: Dynamische Anzeige des Modus im Toast ---
+    showToast(`EdgAr (${currentModel.toUpperCase()}) analysiert...`, "blue");
 
     const fullPrompt = `AKTUELLER CODE:\n${currentCode}\n\nAUFGABE:\n${promptText}\n\nRegel: Nur Code ausgeben.`;
 
@@ -886,7 +936,11 @@ async function sendAI() {
         const res = await fetch("https://edgaride.vercel.app/api/ai", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt: fullPrompt })
+            // --- HIER WIRD DAS MODELL JETZT MITGESCHICKT ---
+            body: JSON.stringify({ 
+                prompt: fullPrompt,
+                model: currentModel // Diese Variable wird durch deine neuen Buttons gesetzt
+            })
         });
 
         if (!res.ok) throw new Error("API-Fehler");
@@ -897,9 +951,15 @@ async function sendAI() {
         // Bereinigung
         aiCode = aiCode.replace(/```[a-z]*\n/gi, '').replace(/```/g, '').trim();
 
+        // --- SICHERUNGSKOPIE FÜR TIME MACHINE ---
+        if (typeof codeHistory !== 'undefined') {
+            codeHistory.unshift(currentCode); 
+            if (codeHistory.length > 10) codeHistory.pop(); 
+            if (typeof redoStack !== 'undefined') redoStack = []; 
+        }
+
         aiInputEl.value = aiCode;
         
-        // Code in Monaco einfügen
         editor.executeEdits("ai-update", [{ 
             range: editor.getModel().getFullModelRange(), 
             text: aiCode 
@@ -917,6 +977,42 @@ async function sendAI() {
     }
 }
 
+function undoAI() {
+    if (codeHistory.length === 0) {
+        showToast("Kein Rückwärts-Verlauf", "red");
+        return;
+    }
+    const currentCode = editor.getValue();
+    redoStack.unshift(currentCode); // Merke dir den jetzigen Stand für Redo!
+    
+    const lastCode = codeHistory.shift(); 
+    editor.setValue(lastCode);
+    showToast("Rückgängig gemacht ⏪", "blue");
+    setTimeout(() => runCode(), 300);
+}
+
+function redoAI() {
+    if (redoStack.length === 0) {
+        showToast("Nichts zum Wiederholen", "red");
+        return;
+    }
+    const currentCode = editor.getValue();
+    codeHistory.unshift(currentCode); // Den aktuellen Stand wieder in die History packen
+    
+    const nextCode = redoStack.shift(); // Den Code aus dem Redo-Speicher holen
+    editor.setValue(nextCode);
+    showToast("Wiederholt ⏩", "purple");
+    setTimeout(() => runCode(), 300);
+}
+
+function clearAIPrompt() {
+    const aiInput = document.querySelector('textarea.flex-1');
+    if (aiInput) {
+        aiInput.value = '';
+        aiInput.focus(); // Cursor direkt wieder reinsetzen
+        showToast("Eingabe gelöscht 🗑️", "blue");
+    }
+}
 
 window.addEventListener('message', (event) => {
     if (event.data.type === 'iframeError') {
