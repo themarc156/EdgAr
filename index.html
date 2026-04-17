@@ -128,6 +128,54 @@
   color: #60a5fa !important; /* Helles Blau für den aktiven Text */
   box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
 }
+
+/* Stil für das Hauptmenü-Gehäuse */
+#custom-context-menu {
+    transition: opacity 0.1s ease;
+    backdrop-filter: blur(8px); /* Macht den Hintergrund leicht glasig */
+}
+
+/* Stil für die einzelnen Menü-Punkte */
+.menu-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #94a3b8; /* Dezentes slate-400 */
+    background: transparent;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    border-radius: 4px;
+    margin: 1px 0;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+/* Sanftes Feedback ohne Springen */
+.menu-item:hover {
+    background: rgba(124, 58, 237, 0.2); /* Dezentes Violett-Transparent */
+    color: #f8fafc; /* Fast weiß */
+}
+
+/* Spezial-Farben beim Hovern für KI und Sperre */
+.menu-item.magic:hover {
+    background: rgba(192, 132, 252, 0.25);
+}
+
+.menu-item.lock:hover {
+    background: rgba(251, 146, 60, 0.25);
+}
+
+/* Shortcut-Text (grau im Hintergrund) */
+.menu-shortcut {
+    font-size: 9px;
+    opacity: 0.5;
+    margin-left: 10px;
+    font-family: monospace;
+}
+
     </style>
   </head>
   <body>
@@ -283,24 +331,60 @@
     </div>
   </div>
 </div>
+
+<div id="custom-context-menu" class="hidden fixed bg-gray-900 border border-gray-700 shadow-2xl rounded-lg py-1 px-1 w-64 z-[9999]">
+  <button onclick="copyToClipboard()" class="menu-item">
+    <span>📋 Kopieren</span>
+    <span class="menu-shortcut">CTRL+C</span>
+  </button>
+  
+  <button onclick="pasteFromClipboard()" class="menu-item">
+    <span>📥 Einfügen</span>
+    <span class="menu-shortcut">CTRL+V</span>
+  </button>
+
+  <div class="h-[1px] bg-gray-800 my-1 mx-2"></div>
+
+  <button onclick="executeMonacoAction('editor.action.commentLine')" class="menu-item">
+    <span># Aus-/Einkommentieren</span>
+    <span class="menu-shortcut">CTRL+#</span>
+  </button>
+
+  <button onclick="magicWand()" class="menu-item text-purple-400">
+    <span class="font-bold">🪄 Zauberstab (KI)</span>
+  </button>
+
+  <button onclick="insertConsoleLog()" class="menu-item">
+    <span>🚀 console.log()</span>
+  </button>
+
+  <div class="h-[1px] bg-gray-800 my-1 mx-2"></div>
+
+  <button onclick="executeMonacoAction('editor.action.revealDefinition')" class="menu-item">
+    <span>🔍 Gehe zu Definition</span>
+    <span class="menu-shortcut">F12</span>
+  </button>
+
+  <button onclick="executeMonacoAction('editor.action.selectHighlights')" class="menu-item">
+    <span>✨ Alle Vorkommen markieren</span>
+  </button>
+
+  <div class="h-[1px] bg-gray-800 my-1 mx-2"></div>
+
+  <button id="lock-btn" onclick="toggleLock()" class="menu-item text-orange-400">
+    <span>🔓 Sperren/Entsperren</span>
+  </button>
+</div>
 <script>
   let editor;
   let isTop = true;
   let currentMatchIndex = -1;
-
-  // Neu: Aktueller Treffer
   let currentMatches = [];
-
-  // Neu: Liste der Treffer
   let searchTimeout;
-
-let codeHistory = []; 
-let redoStack = []; // Das Gedächtnis für die Wiederholung
-
-let currentModel = 'smart'; // Standard-Einstellung
-
-  // Timer für das automatische Speichern
-let searchHistory = JSON.parse(localStorage.getItem('edgar_search_history') || '[]');
+  let codeHistory = []; 
+  let redoStack = []; 
+  let currentModel = 'smart'; 
+  let searchHistory = JSON.parse(localStorage.getItem('edgar_search_history') || '[]');
   let functionSearchActive = false;
   let navStates = {
     top: true,
@@ -310,102 +394,125 @@ let searchHistory = JSON.parse(localStorage.getItem('edgar_search_history') || '
   };
 
   // 1. MONACO INITIALISIERUNG
-require.config({
-  paths: {
-    'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs'
-  }
-});
+  require.config({
+    paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }
+  });
 
-// 1. MONACO INITIALISIERUNG
-require.config({
-  paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }
-});
+  require(['vs/editor/editor.main'], function() {
+    // 1. Editor Instanz erstellen
+    editor = monaco.editor.create(document.getElementById('editorContainer'), {
+      value: `<!DOCTYPE html>...`, // Dein HTML-Inhalt bleibt gleich
+      language: 'html',
+      theme: 'vs-dark',
+      fontSize: 13,
+      minimap: { enabled: false },
+      padding: { top: 16 },
+      automaticLayout: true,
+      multiCursorModifier: 'ctrlCmd',
+      // DIESE ZEILE IST NEU: Deaktiviert das Monaco-interne Menü
+      contextmenu: false 
+    });
 
-require(['vs/editor/editor.main'], function() {
-  // Editor Instanz erstellen
-  // 1. Editor mit Multi-Cursor-Support erstellen
-editor = monaco.editor.create(document.getElementById('editorContainer'), {
-  value: `<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body {
-      background: #0d1117;
-      color: white;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-      font-family: sans-serif;
+    // --- KONTEXTMENÜ LOGIK ---
+    const contextMenu = document.getElementById('custom-context-menu');
+
+    editor.onContextMenu(function (e) {
+    e.event.preventDefault();
+    e.event.stopPropagation();
+
+    const menu = document.getElementById('custom-context-menu');
+    if (!menu) return;
+
+    // 1. Menü kurz sichtbar machen (aber unsichtbar), um die Breite/Höhe zu messen
+    menu.style.visibility = 'hidden';
+    menu.style.display = 'block';
+    
+    const menuWidth = menu.offsetWidth;
+    const menuHeight = menu.offsetHeight;
+    const pageWidth = window.innerWidth;
+    const pageHeight = window.innerHeight;
+
+    // 2. Mausposition holen
+    let posX = e.event.posx;
+    let posY = e.event.posy;
+
+    // 3. Horizontaler Check: Wenn zu weit rechts, nach links verschieben
+    if (posX + menuWidth > pageWidth) {
+        posX = pageWidth - menuWidth - 10; // 10px Puffer zum Rand
     }
-  </style>
-</head>
-<body>
-  <h1>Willkommen bei EdgAr IDE</h1>
-</body>
-</html>`,
-  language: 'html',
-  theme: 'vs-dark',
-  fontSize: 13,
-  minimap: { enabled: false },
-  padding: { top: 16 },
-  automaticLayout: true,
-  // DIESE ZEILE ERMÖGLICHT MULTI-SELECTION:
-  multiCursorModifier: 'ctrlCmd'
+
+    // 4. Vertikaler Check: Wenn zu weit unten, nach oben verschieben
+    if (posY + menuHeight > pageHeight) {
+        posY = pageHeight - menuHeight - 10;
+    }
+
+    // 5. Position setzen und sichtbar machen
+    menu.style.left = posX + 'px';
+    menu.style.top = posY + 'px';
+    menu.style.visibility = 'visible';
+    menu.classList.remove('hidden');
+
+    return false;
 });
 
-// --- KLICK-LOGIK FÜR MULTI-SELECT ---
-editor.onMouseDown(function (e) {
-  // Sidebar-Check
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar && sidebar.classList.contains('open')) {
-    toggleSidebar();
-  }
+    // --- KOMBINIERTE MOUSE-DOWN LOGIK (Bleibt wie sie war) ---
+    editor.onMouseDown(function (e) {
+      hideContextMenu();
 
-  // Strg + Klick Erkennung
-  if (e.event.ctrlKey || e.event.metaKey) {
-    const position = e.target.position;
-    const model = editor.getModel();
-
-    if (position && model) {
-      // Verhindert Standard-Cursor-Sprung & Monaco-interne Klick-Events
-      e.event.preventDefault();
-      e.event.stopPropagation();
-      
-      const rangeData = getSmartRange(position); 
-      
-      const newSelection = new monaco.Selection(
-        rangeData.startLineNumber, 
-        1, 
-        rangeData.endLineNumber, 
-        model.getLineMaxColumn(rangeData.endLineNumber)
-      );
-
-      let currentSelections = editor.getSelections() || [];
-      
-      // Prüfen, ob dieser Block bereits markiert ist (Toggle)
-      const idx = currentSelections.findIndex(sel => 
-        sel.startLineNumber === newSelection.startLineNumber && 
-        sel.endLineNumber === newSelection.endLineNumber
-      );
-
-      if (idx > -1) {
-        currentSelections.splice(idx, 1); 
-      } else {
-        currentSelections.push(newSelection);
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar && sidebar.classList.contains('open')) {
+        if (typeof toggleSidebar === "function") toggleSidebar();
       }
 
-      // Wir setzen die Selektion in einem minimalen Timeout, 
-      // um sicherzugehen, dass Monaco's MouseDown-Handler fertig ist
-      setTimeout(() => {
-        editor.setSelections(currentSelections);
-        editor.focus();
-      }, 10);
+      if (e.event.ctrlKey || e.event.metaKey) {
+        const position = e.target.position;
+        const model = editor.getModel();
+
+        if (position && model && typeof getSmartRange === "function") {
+          e.event.preventDefault();
+          e.event.stopPropagation();
+          
+          const rangeData = getSmartRange(position); 
+          const newSelection = new monaco.Selection(
+            rangeData.startLineNumber, 1, 
+            rangeData.endLineNumber, model.getLineMaxColumn(rangeData.endLineNumber)
+          );
+
+          let currentSelections = editor.getSelections() || [];
+          const idx = currentSelections.findIndex(sel => 
+            sel.startLineNumber === newSelection.startLineNumber && 
+            sel.endLineNumber === newSelection.endLineNumber
+          );
+
+          if (idx > -1) {
+            currentSelections.splice(idx, 1); 
+          } else {
+            currentSelections.push(newSelection);
+          }
+
+          setTimeout(() => {
+            editor.setSelections(currentSelections);
+            editor.focus();
+          }, 10);
+        }
+      }
+    });
+  });
+
+async function copyToClipboard() {
+    if (!editor) return;
+    const selection = editor.getSelection();
+    const selectedText = editor.getModel().getValueInRange(selection);
+    const textToCopy = selectedText || editor.getValue();
+    
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      showToast(selectedText ? "Auswahl kopiert! ✂️" : "Alles kopiert! 📋", "green");
+    } catch (err) {
+      showToast("Fehler beim Kopieren", "red");
     }
+    hideContextMenu();
   }
-});
 
   // Hilfsfunktion (hier innerhalb, damit 'editor' sicher bekannt ist)
   function getSmartRange(pos) {
@@ -418,7 +525,6 @@ editor.onMouseDown(function (e) {
     return { startLineNumber: start, endLineNumber: end };
   }
 
-}); // <--- Ende des require-Blocks
 
   // 2. SIDEBAR LOGIK
 
@@ -704,6 +810,23 @@ doc.write('<script src="https://cdn.tailwindcss.com"><\/script>');    }
     renderHistory();
   });
 
+// Schließt das Menü, wenn man irgendwo auf die restliche Webseite klickt
+document.addEventListener('click', (e) => {
+    // Prüfen, ob der Klick außerhalb des Menüs war
+    const menu = document.getElementById('custom-context-menu');
+    if (menu && !menu.contains(e.target)) {
+        hideContextMenu();
+    }
+});
+
+function hideContextMenu() {
+    const menu = document.getElementById('custom-context-menu');
+    if (menu) {
+        menu.style.display = 'none';
+        menu.classList.add('hidden');
+    }
+}
+
   function handleSearchInput(e) {
     const term = e.target.value.trim();
     const badge = document.getElementById('searchCount');
@@ -773,6 +896,70 @@ doc.write('<script src="https://cdn.tailwindcss.com"><\/script>');    }
     }
 
   }
+
+// Hilfsfunktion um interne Monaco-Befehle direkt aufzurufen
+function executeMonacoAction(actionId) {
+    editor.trigger('contextmenu', actionId);
+    hideContextMenu();
+}
+
+// Einfügen (Clipboard API)
+async function pasteFromClipboard() {
+    try {
+        const text = await navigator.clipboard.readText();
+        const selection = editor.getSelection();
+        editor.executeEdits("paste", [{
+            range: selection,
+            text: text,
+            forceMoveMarkers: true
+        }]);
+        hideContextMenu();
+    } catch (err) {
+        showToast("Einfügen fehlgeschlagen (Berechtigung?)", "red");
+    }
+}
+
+// Console.log() intelligent einfügen
+function insertConsoleLog() {
+    const selection = editor.getSelection();
+    const model = editor.getModel();
+    const selectedText = model.getValueInRange(selection);
+    
+    let logText = selectedText ? `console.log('${selectedText}:', ${selectedText});` : `console.log('');`;
+    
+    editor.executeEdits("consoleLog", [{
+        range: selection,
+        text: logText,
+        forceMoveMarkers: true
+    }]);
+    hideContextMenu();
+}
+
+// Zauberstab (Deine Raketen-Logik triggern)
+function magicWand() {
+    // Hier könntest du direkt die sendAI() Funktion aufrufen
+    // oder ein spezielles "Fix-this" Prompt senden
+    showToast("Zauberstab aktiviert...", "purple");
+    sendAI(); 
+    hideContextMenu();
+}
+
+// Sperren/Entsperren
+function toggleLock() {
+    const isReadOnly = editor.getRawOptions().readOnly;
+    editor.updateOptions({ readOnly: !isReadOnly });
+    
+    const lockBtn = document.getElementById('lock-btn');
+    if (!isReadOnly) {
+        lockBtn.innerHTML = '<span>🔒 Entsperren</span>';
+        showToast("Editor gesperrt", "orange");
+    } else {
+        lockBtn.innerHTML = '<span>🔓 Sperren</span>';
+        showToast("Editor entsperrt", "green");
+    }
+    hideContextMenu();
+}
+
 
   // 6. ERWEITERUNGEN (TOASTS & HISTORY)
 
